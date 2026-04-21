@@ -7,6 +7,8 @@ export default function CourseDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('Overview');
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
   const [course, setCourse] = useState({
      title: "React Complete Course 2024",
      rating: 4.9,
@@ -16,7 +18,8 @@ export default function CourseDetails() {
   });
 
   useEffect(() => {
-    fetch(`http://localhost:8006/courses/${id || 'playlist-fastapi-basics'}`)
+    const courseId = id || 'playlist-fastapi-basics';
+    fetch(`http://localhost:8006/courses/${courseId}?user_id=${USER_ID}`)
       .then(res => res.json())
       .then(data => {
         if(data && data.title) {
@@ -30,7 +33,22 @@ export default function CourseDetails() {
         }
       })
       .catch(err => console.log('Backend not available, using mock details.', err));
+
+      const enrolledCourses = JSON.parse(localStorage.getItem('enrolled_courses') || '[]');
+      if(enrolledCourses.includes(courseId)) {
+        setIsEnrolled(true);
+      }
   }, [id]);
+
+  const handleCourseEnroll = () => {
+    const courseId = id || 'playlist-fastapi-basics';
+    const enrolledCourses = JSON.parse(localStorage.getItem('enrolled_courses') || '[]');
+    if(!enrolledCourses.includes(courseId)) {
+      enrolledCourses.push(courseId);
+      localStorage.setItem('enrolled_courses', JSON.stringify(enrolledCourses));
+    }
+    setIsEnrolled(true);
+  };
 
   return (
     <div className="course-details">
@@ -53,9 +71,15 @@ export default function CourseDetails() {
           <span className="students">{course.students} students</span>
           <span className="duration"><Clock size={16} /> {course.duration}</span>
         </div>
-        <button className="btn-primary" onClick={() => navigate('/path/details')}>
-          Start Learning
-        </button>
+        {isEnrolled ? (
+          <button className="btn-primary" onClick={() => navigate('/video')} style={{background: 'var(--accent-honey)', color: 'var(--text-dark)'}}>
+            Resume Course
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={handleCourseEnroll}>
+            Enroll in Course
+          </button>
+        )}
       </div>
 
       <div className="tabs">
@@ -89,13 +113,21 @@ export default function CourseDetails() {
         
         {activeTab === 'Lessons' && (
            <div className="overview">
-             <p>Lessons go here (mirrors curriculum list)</p>
+             {!isEnrolled ? (
+               <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg-light)', borderRadius: '12px' }}>
+                 <p style={{fontWeight: 'bold', color: 'var(--text-silver)', marginBottom: '8px'}}>Content Locked</p>
+                 <p style={{fontSize: '13px', color: 'var(--text-silver)', marginBottom: '16px'}}>Please enroll in the course to view the full curriculum map.</p>
+                 <button className="btn-primary small-btn" onClick={handleCourseEnroll}>Enroll</button>
+               </div>
+             ) : (
+               <p>Lessons and Video player link goes here.</p>
+             )}
            </div>
         )}
 
         {activeTab === 'Reviews' && (
            <div className="overview">
-             <p>Reviews go here</p>
+             <p>4.8 out of 5 stars based on 1,200 reviews</p>
            </div>
         )}
       </div>

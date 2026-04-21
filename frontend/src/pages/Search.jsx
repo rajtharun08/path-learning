@@ -17,17 +17,18 @@ export default function Search() {
     
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
-      fetch(`http://localhost:8006/paths/search?q=${encodeURIComponent(query)}`)
+      fetch(`http://localhost:8000/playlist/search?q=${encodeURIComponent(query)}`)
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data)) {
-            const formatted = data.map(path => ({
-              id: path.path_id || path.playlist_id,
-              title: path.title,
-              category: "Learning Path",
-              rating: path.rating || 4.5,
-              students: "1.2k",
-              img: path.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+          const items = data.items || [];
+          if (Array.isArray(items)) {
+            const formatted = items.map(course => ({
+              id: course.id || course.playlist_id,
+              title: course.title,
+              category: "Course",
+              rating: course.rating || 4.8,
+              students: "12.5k",
+              img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
             }));
             setResults(formatted);
           } else {
@@ -71,11 +72,11 @@ export default function Search() {
         <div className="course-list">
           {!loading && results.map(course => (
             <div key={course.id} className="course-card" onClick={() => navigate(`/course/${course.id}`)}>
-              <img src={course.img} alt={course.title} />
-              <div className="course-info">
-                <span className="course-cat">{course.category}</span>
-                <h3>{course.title}</h3>
-                <div className="course-meta">
+              <img src={course.img} alt={course.title} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+              <div className="course-info" style={{ padding: '16px' }}>
+                <span className="course-cat" style={{ fontSize: '12px', color: 'var(--primary-dark)', fontWeight: 'bold' }}>{course.category}</span>
+                <h3 style={{ margin: '4px 0', fontSize: '16px' }}>{course.title}</h3>
+                <div className="course-meta" style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-silver)', marginTop: '8px' }}>
                   <span className="rating"><Star size={14} fill="var(--accent-honey)" color="var(--accent-honey)" /> {course.rating}</span>
                   <span className="students">{course.students} students</span>
                 </div>

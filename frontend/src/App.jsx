@@ -5,6 +5,7 @@ import LearningPath from './pages/LearningPath';
 import CourseDetails from './pages/CourseDetails';
 import VideoPlayer from './pages/VideoPlayer';
 import Search from './pages/Search';
+import PathsDirectory from './pages/PathsDirectory';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<MobileLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="search" element={<Search />} />
+          <Route path="paths" element={<PathsDirectory />} />
           <Route path="path/:id" element={<LearningPath />} />
           <Route path="course/:id" element={<CourseDetails />} />
         </Route>

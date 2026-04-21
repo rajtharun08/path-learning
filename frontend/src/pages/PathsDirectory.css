@@ -1,0 +1,125 @@
+.paths-directory {
+  padding: 0;
+  padding-bottom: 100px;
+  background-color: var(--bg-light);
+}
+
+.dir-header {
+  background: white;
+  padding: 24px;
+}
+
+.dir-header .subtitle {
+  font-size: 14px;
+  color: var(--text-silver);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dir-section-title {
+  padding: 24px;
+  background: white;
+  margin-bottom: 24px;
+}
+
+.blue-bar-text {
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 500;
+  border-left: 2px solid var(--primary-dark);
+  padding-left: 8px;
+  display: block;
+  margin-bottom: 24px;
+}
+
+.dir-section-title h2 {
+  font-size: 20px;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+
+.dir-section-title .desc {
+  font-size: 14px;
+  color: var(--text-silver);
+  margin-bottom: 24px;
+}
+
+.search-bar-with-btn {
+  display: flex;
+  gap: 12px;
+}
+
+.search-bar-with-btn input {
+  flex: 1;
+  background: var(--bg-light);
+  border: 1px solid var(--border-light-2);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.search-submit {
+  background: var(--primary-dark);
+  border: none;
+  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.paths-list {
+  padding: 0 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.course-card-textual {
+  background: white;
+  border: 1px solid var(--border-light-2);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.text-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.text-header h3 {
+  font-size: 16px;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.course-desc {
+  font-size: 13px;
+  color: var(--text-silver);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.course-meta-bottom {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-silver);
+  margin-top: 4px;
+}
+
+.full-btn {
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 12px;
+}

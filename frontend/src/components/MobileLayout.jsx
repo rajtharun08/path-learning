@@ -14,7 +14,7 @@ export default function MobileLayout() {
           <Home size={24} />
           <span>Home</span>
         </NavLink>
-        <NavLink to="/path/frontend-dev" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <NavLink to="/paths" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <PlayCircle size={24} />
           <span>Path</span>
         </NavLink>

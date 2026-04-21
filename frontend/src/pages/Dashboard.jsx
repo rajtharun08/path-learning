@@ -13,11 +13,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Fetch all courses for the list
-    fetch('http://localhost:8002/playlist/all')
+    fetch('http://localhost:8000/playlist/all')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          const formatted = data.map(course => ({
+        const items = data.items || [];
+        if (Array.isArray(items) && items.length > 0) {
+          const formatted = items.map(course => ({
             id: course.id || course.playlist_id,
             title: course.title,
             category: "Development",
@@ -26,6 +27,10 @@ export default function Dashboard() {
             img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
           }));
           setPopularCourses(formatted);
+        } else {
+          setPopularCourses([{
+            id: 'mock-1', title: 'React Complete Course 2024', category: 'Development', rating: 4.9, students: '18.2k', img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
+          }]);
         }
       })
       .catch(err => {
@@ -40,13 +45,29 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-           setContinuePaths(data.slice(0, 2).map(p => ({
-              id: p.path_id, title: p.title
-           })));
-        } else {
-           setContinuePaths([{ id: 'mock-path', title: 'Frontend Development' }]);
+          const formatted = data.map(path => ({
+            id: path.path_id,
+            title: path.title,
+            progress: path.average_completion_rate || 50
+          }));
+          
+          const enrolled = JSON.parse(localStorage.getItem('enrolled_paths') || '[]');
+          if (enrolled.length > 0) {
+              setContinuePaths(formatted.filter(p => enrolled.includes(p.id)));
+          } else {
+              setContinuePaths([]);
+          }
         }
-      }).catch(() => setContinuePaths([{ id: 'mock-path', title: 'Frontend Development' }]));
+      })
+      .catch(err => {
+         console.log('Backend offline, using mock paths.', err);
+         const enrolled = JSON.parse(localStorage.getItem('enrolled_paths') || '[]');
+         const mock = [
+            { id: '11111111-1111-4111-a111-111111111111', title: 'Frontend Development', progress: 40 },
+            { id: '22222222-2222-4222-a222-222222222222', title: 'Python Developer', progress: 10 }
+         ];
+         setContinuePaths(enrolled.length > 0 ? mock.filter(m => enrolled.includes(m.id)) : []);
+      });
   }, []);
 
   return (
@@ -61,21 +82,27 @@ export default function Dashboard() {
 
       <section className="continue-learning">
         <h2>Continue Learning</h2>
-        {continuePaths.length === 0 && <p style={{ color: 'var(--text-silver)', fontSize: 14 }}>No paths found in your backend. Import a playlist to get started.</p>}
-        <div className="continue-cards">
-          {continuePaths.map(path => (
-            <div key={path.id} className="continue-card" onClick={() => navigate(`/path/${path.id}`)}>
-              <h3>{path.title}</h3>
-              <div className="progress-container">
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: '0%' }}></div>
+        {continuePaths.length > 0 ? (
+          <div className="continue-cards">
+            {continuePaths.map(path => (
+              <div key={path.id} className="continue-card" onClick={() => navigate(`/path/${path.id}`)}>
+                <h3>{path.title}</h3>
+                <div className="progress-container">
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${path.progress || 0}%` }}></div>
+                  </div>
+                  <span className="progress-text">{path.progress || 0}% complete</span>
                 </div>
-                <span className="progress-text">0% complete</span>
+                <button className="btn-primary small-btn" onClick={(e) => { e.stopPropagation(); navigate(`/path/${path.id}`); }}>Resume</button>
               </div>
-              <button className="btn-primary small-btn">Resume</button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: '24px', background: 'white', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--border-light-2)'}}>
+            <p style={{ color: 'var(--text-silver)', fontSize: '13px', margin: '0 0 16px 0'}}>You haven't enrolled in any paths yet. Explore the Paths directory to start your journey!</p>
+            <button className="btn-primary small-btn" onClick={() => navigate('/paths')}>Explore Paths</button>
+          </div>
+        )}
       </section>
 
       <section className="popular-courses">
