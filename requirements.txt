@@ -1,0 +1,28 @@
+# Consolidated Requirements for Path Learning Platform
+
+# Core Web Framework
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+pydantic-settings==2.10.1
+httpx==0.28.1
+python-dotenv==1.0.1
+
+# Database & Migration
+sqlalchemy==2.0.43
+asyncpg==0.30.0
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Security & Tokens
+PyJWT==2.10.1
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Utility & Integration
+slowapi==0.1.9
+google-api-python-client==2.131.0
+APScheduler==3.10.4
+
+# Testing
+pytest==8.2.2

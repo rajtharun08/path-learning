@@ -268,7 +268,6 @@ export default function VideoPlayer() {
             const isLast = currentIndex === syllabus.length - 1;
             const progress = videoStats.current / (videoStats.total || 1);
             const currentItem = syllabus[currentIndex];
-            const currentItem = syllabus[currentIndex];
             const canProceed = lessonUnlocked || (currentItem && currentItem.completed); 
 
             return (
