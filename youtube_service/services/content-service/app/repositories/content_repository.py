@@ -87,7 +87,13 @@ class ContentRepository:
         )
 
     def get_all_playlists(self, offset: int = 0, limit: int = 20) -> List[Playlist]:
-        return self.db.query(Playlist).offset(offset).limit(limit).all()
+        return (
+            self.db.query(Playlist)
+            .options(selectinload(Playlist.videos))
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
     def count_playlists(self) -> int:
         return self.db.query(Playlist).count()

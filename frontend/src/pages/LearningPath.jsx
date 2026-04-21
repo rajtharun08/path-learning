@@ -146,7 +146,15 @@ export default function LearningPath() {
 
       {isEnrolled && (
         <div className="bottom-action">
-          <button className="btn-primary" onClick={() => navigate('/video')}>
+          <button className="btn-primary" onClick={() => {
+              if (progressData && progressData.next_up) {
+                  navigate(`/video/${progressData.next_up.playlist_id}`);
+              } else if (modules.length > 0) {
+                  navigate(`/video/${modules[0].id}`);
+              } else {
+                  navigate('/video');
+              }
+          }}>
             <PlayCircle size={20} style={{ marginRight: 8 }} /> Resume Learning
           </button>
         </div>

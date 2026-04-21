@@ -19,6 +19,7 @@ function App() {
           <Route path="course/:id" element={<CourseDetails />} />
         </Route>
         {/* Full screen routes like Video Player */}
+        <Route path="/video/:courseId" element={<VideoPlayer />} />
         <Route path="/video" element={<VideoPlayer />} />
       </Routes>
     </Router>

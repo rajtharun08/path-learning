@@ -9,12 +9,14 @@ export default function CourseDetails() {
   const [activeTab, setActiveTab] = useState('Overview');
   const [isEnrolled, setIsEnrolled] = useState(false);
   const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
+  const [lessons, setLessons] = useState([]);
   const [course, setCourse] = useState({
-     title: "React Complete Course 2024",
-     rating: 4.9,
-     students: "18.2k",
-     duration: "12 hours",
-     desc: "Master React from basics to advanced concepts. Build real-world applications with hooks, context, and modern patterns."
+     title: "Loading Course...",
+     rating: 0,
+     students: "0",
+     duration: "-",
+     desc: "",
+     img: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
   });
 
   useEffect(() => {
@@ -25,11 +27,20 @@ export default function CourseDetails() {
         if(data && data.title) {
            setCourse({
              title: data.title,
-             rating: 4.8, 
+             rating: data.rating || 4.8, 
              students: "1.2k",
-             duration: data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours",
-             desc: data.description || course.desc
+             duration: data.duration || (data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours"),
+             desc: data.description || course.desc,
+             img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || course.img
            });
+           if (data.lessons) {
+             setLessons(data.lessons.map((l, i) => ({
+                id: l.youtube_video_id || i,
+                title: l.title || `Lesson ${i+1}`,
+                duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
+                status: l.completed ? 'complete' : 'playing'
+             })));
+           }
         }
       })
       .catch(err => console.log('Backend not available, using mock details.', err));
@@ -60,7 +71,7 @@ export default function CourseDetails() {
       </header>
 
       <div className="hero-img">
-        <img src="https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=800&auto=format&fit=crop" alt="hero" />
+        <img src={course.img} alt={course.title} />
       </div>
 
       <div className="course-header">
@@ -72,7 +83,7 @@ export default function CourseDetails() {
           <span className="duration"><Clock size={16} /> {course.duration}</span>
         </div>
         {isEnrolled ? (
-          <button className="btn-primary" onClick={() => navigate('/video')} style={{background: 'var(--accent-honey)', color: 'var(--text-dark)'}}>
+          <button className="btn-primary" onClick={() => navigate(`/video/${id || 'playlist-fastapi-basics'}`)} style={{background: 'var(--accent-honey)', color: 'var(--text-dark)'}}>
             Resume Course
           </button>
         ) : (
@@ -120,7 +131,25 @@ export default function CourseDetails() {
                  <button className="btn-primary small-btn" onClick={handleCourseEnroll}>Enroll</button>
                </div>
              ) : (
-               <p>Lessons and Video player link goes here.</p>
+               <div className="course-lessons-list">
+                 {lessons.length > 0 ? (
+                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                     {lessons.map((lesson, idx) => (
+                       <div key={lesson.id} style={{ display: 'flex', alignItems: 'center', background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light-2)', cursor: 'pointer' }} onClick={() => navigate(`/video/${id}`)}>
+                         <div style={{ background: 'var(--bg-light)', color: 'var(--primary-dark)', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontWeight: 'bold', fontSize: '14px', marginRight: '16px' }}>
+                           {idx + 1}
+                         </div>
+                         <div style={{ flex: 1 }}>
+                           <h4 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>{lesson.title}</h4>
+                           <span style={{ color: 'var(--text-silver)', fontSize: '12px' }}>{lesson.duration}</span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <p style={{ color: 'var(--text-silver)' }}>Fetching playlist content...</p>
+                 )}
+               </div>
              )}
            </div>
         )}

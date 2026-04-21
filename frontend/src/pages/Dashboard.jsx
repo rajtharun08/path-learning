@@ -12,19 +12,20 @@ export default function Dashboard() {
   const [continuePaths, setContinuePaths] = useState([]);
 
   useEffect(() => {
-    // Fetch all courses for the list
-    fetch('http://localhost:8000/playlist/all')
+    // Fetch all courses using the basic list endpoint to avoid search parameter validation
+    fetch('http://localhost:8002/playlist/all')
       .then(res => res.json())
       .then(data => {
+        console.log('Dashboard Playlists Data:', data);
         const items = data.items || [];
         if (Array.isArray(items) && items.length > 0) {
           const formatted = items.map(course => ({
-            id: course.id || course.playlist_id,
+            id: course.youtube_playlist_id || course.id || course.playlist_id,
             title: course.title,
             category: "Development",
             rating: 4.8,
-            students: "12.5k",
-            img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+            students: "1.2k",
+            img: course.thumbnail_url || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
           }));
           setPopularCourses(formatted);
         } else {
@@ -34,10 +35,8 @@ export default function Dashboard() {
         }
       })
       .catch(err => {
-         console.log('Backend offline or empty', err);
-         setPopularCourses([{
-            id: 'mock-1', title: 'React Complete Course 2024', category: 'Development', rating: 4.9, students: '18.2k', img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
-         }]);
+         console.error('Dashboard Fetch failed:', err);
+         setPopularCourses([]);
       });
 
     // Fetch continue paths

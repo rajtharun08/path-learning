@@ -17,18 +17,19 @@ export default function Search() {
     
     setLoading(true);
     const delayDebounceFn = setTimeout(() => {
-      fetch(`http://localhost:8000/playlist/search?q=${encodeURIComponent(query)}`)
+      fetch(`http://localhost:8002/playlist/search?q=${encodeURIComponent(query)}`)
         .then(res => res.json())
         .then(data => {
+          console.log('Search Raw Data:', data);
           const items = data.items || [];
           if (Array.isArray(items)) {
             const formatted = items.map(course => ({
-              id: course.id || course.playlist_id,
+              id: course.youtube_playlist_id || course.id || course.playlist_id,
               title: course.title,
               category: "Course",
               rating: course.rating || 4.8,
-              students: "12.5k",
-              img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+              students: "1.2k",
+              img: course.thumbnail_url || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
             }));
             setResults(formatted);
           } else {
@@ -66,7 +67,7 @@ export default function Search() {
       <div className="search-results">
         {loading && <p className="loading-text">Searching...</p>}
         {!loading && query && results.length === 0 && (
-          <p className="no-results">No paths found matching your query.</p>
+          <p className="no-results">No courses found matching your query.</p>
         )}
         
         <div className="course-list">
