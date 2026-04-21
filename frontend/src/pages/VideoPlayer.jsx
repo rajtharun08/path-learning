@@ -9,9 +9,10 @@ export default function VideoPlayer() {
   const [syllabus, setSyllabus] = useState([]);
   const [courseProgress, setCourseProgress] = useState(0);
   const [currentLesson, setCurrentLesson] = useState('Lesson Loading...');
-  const [currentVideoId, setCurrentVideoId] = useState(null);
-  const [playerReady, setPlayerReady] = useState(false);
-  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
+   const [currentVideoId, setCurrentVideoId] = useState(null);
+   const [playerReady, setPlayerReady] = useState(false);
+   const [videoStats, setVideoStats] = useState({ current: 0, total: 1 });
+   const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
   
   // Custom YouTube Player reference
   const playerRef = window.ytPlayerRef || {};
@@ -29,13 +30,17 @@ export default function VideoPlayer() {
           setCourseProgress(data.progress_percent || 0);
 
           if (data.lessons && data.lessons.length > 0) {
-            setSyllabus(data.lessons.map((l, i) => ({
-              id: l.youtube_video_id || `temp-${i}`,
-              title: l.title || `Lesson ${i+1}`,
-              duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
-              status: l.completed ? 'complete' : (data.current_lesson && l.youtube_video_id === data.current_lesson.youtube_video_id ? 'playing' : 'locked'),
-              nextId: data.lessons[i + 1]?.youtube_video_id || null
-            })));
+            setSyllabus(data.lessons.map((l, i) => {
+              const isPlaying = data.current_lesson && l.youtube_video_id === data.current_lesson.youtube_video_id;
+              return {
+                id: l.youtube_video_id || `temp-${i}`,
+                title: l.title || `Lesson ${i+1}`,
+                duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
+                status: l.completed ? 'complete' : (isPlaying ? 'playing' : 'locked'),
+                completed: l.completed || false,
+                nextId: data.lessons[i + 1]?.youtube_video_id || null
+              };
+            }));
              if(!data.current_lesson && data.lessons[0]) {
                setCurrentVideoId(data.lessons[0].youtube_video_id);
                setCurrentLesson(data.lessons[0].title);
@@ -45,6 +50,14 @@ export default function VideoPlayer() {
       })
       .catch(err => console.log('Backend down or failed', err));
   }, [courseId]);
+  
+  useEffect(() => {
+    if (syllabus.length > 0) {
+      const completedCount = syllabus.filter(s => s.completed).length;
+      const newProgress = Math.round((completedCount / syllabus.length) * 100);
+      setCourseProgress(newProgress);
+    }
+  }, [syllabus]);
 
   // YouTube Script Injector
   useEffect(() => {
@@ -63,7 +76,7 @@ export default function VideoPlayer() {
 
   const sendProgressAnalytics = async (eventType, seconds, completed) => {
     try {
-      await fetch(`http://localhost:8000/video/progress`, {
+      await fetch(`http://localhost:8003/video/progress`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({
@@ -86,6 +99,8 @@ export default function VideoPlayer() {
          playerEl.innerHTML = ''; 
       }
       
+      let progressInterval;
+      
       const newPlayer = new window.YT.Player('youtube-player', {
         videoId: currentVideoId,
         height: '100%',
@@ -93,16 +108,24 @@ export default function VideoPlayer() {
         playerVars: { autoplay: 1, rel: 0, controls: 1 },
         events: {
           onReady: (e) => {
-             // You can seek to previously watched seconds if available via backend Resume API here
-             setInterval(() => {
-                const state = e.target.getPlayerState();
-                if(state === window.YT.PlayerState.PLAYING) {
-                   const currTime = e.target.getCurrentTime();
-                   sendProgressAnalytics('progress', currTime, false);
+             if (e.target && typeof e.target.getDuration === 'function') {
+                setVideoStats(prev => ({ ...prev, total: e.target.getDuration() || 1 }));
+             }
+             progressInterval = setInterval(() => {
+                if(e.target && typeof e.target.getPlayerState === 'function') {
+                   const state = e.target.getPlayerState();
+                   const cur = e.target.getCurrentTime();
+                   setVideoStats(curStats => ({ ...curStats, current: cur }));
+                   
+                   if(state === window.YT.PlayerState.PLAYING) {
+                      sendProgressAnalytics('progress', cur, false);
+                   }
                 }
-             }, 10000); // 10s ping 
+             }, 1000); // 1s sync for smooth percentages
           },
           onStateChange: (e) => {
+             if (!e.target || typeof e.target.getCurrentTime !== 'function') return;
+             
              const currTime = e.target.getCurrentTime();
              if (e.data === window.YT.PlayerState.PLAYING) {
                 sendProgressAnalytics('play', currTime, false);
@@ -110,12 +133,24 @@ export default function VideoPlayer() {
                 sendProgressAnalytics('pause', currTime, false);
              } else if (e.data === window.YT.PlayerState.ENDED) {
                 sendProgressAnalytics('complete', currTime, true).then(() => {
-                   // Unlock next lesson logic
-                   const currentSyllabusItem = syllabus.find(s => s.id === currentVideoId);
-                   if(currentSyllabusItem && currentSyllabusItem.nextId) {
-                       setCurrentVideoId(currentSyllabusItem.nextId);
-                       // Quick refresh course state
-                       window.location.reload(); 
+                   const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
+                   if (currentIndex !== -1) {
+                       setSyllabus(prev => prev.map((s, idx) => ({
+                          ...s,
+                          status: idx === currentIndex ? 'complete' : s.status,
+                          completed: idx === currentIndex ? true : s.completed
+                       })));
+
+                       if (currentIndex < syllabus.length - 1) {
+                           const nextLesson = syllabus[currentIndex + 1];
+                           setCurrentVideoId(nextLesson.id);
+                           setCurrentLesson(nextLesson.title);
+                           setSyllabus(prev => prev.map((s, idx) => ({
+                              ...s,
+                              status: idx === currentIndex + 1 ? 'playing' : (idx === currentIndex ? 'complete' : s.status),
+                              completed: idx === currentIndex ? true : s.completed
+                           })));
+                       }
                    }
                 });
              }
@@ -123,6 +158,13 @@ export default function VideoPlayer() {
         }
       });
       window.ytPlayerRef = newPlayer;
+
+      return () => {
+         if (progressInterval) clearInterval(progressInterval);
+         if (newPlayer && typeof newPlayer.destroy === 'function') {
+            newPlayer.destroy();
+         }
+      };
     }
   }, [playerReady, currentVideoId]);
 
@@ -137,7 +179,9 @@ export default function VideoPlayer() {
 
       <div className="lesson-details">
         <h1>{currentLesson}</h1>
-        <span className="lesson-count">Lesson 3 of 5</span>
+        <span className="lesson-count">
+          Lesson {syllabus.findIndex(s => s.id === currentVideoId) + 1} of {syllabus.length}
+        </span>
 
         <div className="course-progress">
           <div className="progress-header">
@@ -152,7 +196,23 @@ export default function VideoPlayer() {
         <h2>Course Syllabus</h2>
         <div className="syllabus-list">
           {syllabus.map(item => (
-            <div key={item.id} className={`syllabus-item ${item.status}`}>
+            <div 
+              key={item.id} 
+              className={`syllabus-item ${item.status}`}
+              onClick={() => {
+                if (item.status !== 'locked') {
+                  const clickedId = item.id;
+                  const clickedTitle = item.title;
+                  setCurrentVideoId(clickedId);
+                  setCurrentLesson(clickedTitle);
+                  setSyllabus(prev => prev.map(s => ({
+                    ...s,
+                    status: s.id === clickedId ? 'playing' : (s.status === 'playing' ? (s.completed ? 'complete' : 'available') : s.status)
+                  })));
+                }
+              }}
+              style={{ cursor: item.status !== 'locked' ? 'pointer' : 'default' }}
+            >
               <div className="icon-wrapper">
                 {item.status === 'complete' && <CheckCircle2 size={24} color="#10B981" />}
                 {item.status === 'playing' && <PlayCircle size={24} color="var(--primary-dark)" fill="white" />}
@@ -167,7 +227,11 @@ export default function VideoPlayer() {
               </div>
               <div className="syllabus-trailing">
                 {item.status === 'complete' && <span className="complete-text">100%</span>}
-                {item.status === 'playing' && <span className="active-text">50%</span>}
+                {item.status === 'playing' && (
+                  <span className="active-text">
+                    {Math.floor((videoStats.current / videoStats.total) * 100)}%
+                  </span>
+                )}
                 {item.status === 'locked' && <span className="locked-text">0%</span>}
               </div>
             </div>
@@ -191,15 +255,39 @@ export default function VideoPlayer() {
       </div>
 
       <div className="bottom-action">
-        <button className="btn-primary" onClick={() => {
-            const currentItem = syllabus.find(s => s.id === currentVideoId);
-            if(currentItem && currentItem.nextId) {
-                setCurrentVideoId(currentItem.nextId);
-                window.location.reload();
-            }
-        }}>
-          Next Lesson &gt;
-        </button>
+        {(() => {
+            const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
+            const isLast = currentIndex === syllabus.length - 1;
+            const progress = videoStats.current / (videoStats.total || 1);
+            const currentItem = syllabus[currentIndex];
+            const canProceed = progress >= 0.4 || (currentItem && currentItem.status === 'complete'); 
+
+            return (
+              <button 
+                className={`btn-primary ${!canProceed ? 'btn-disabled' : ''}`}
+                disabled={!canProceed}
+                onClick={() => {
+                  if (isLast) {
+                      // Navigate to assessment or course complete page
+                      alert('Take Assessment module coming soon!');
+                  } else {
+                      const nextLesson = syllabus[currentIndex + 1];
+                      setCurrentVideoId(nextLesson.id);
+                      setCurrentLesson(nextLesson.title);
+                      setSyllabus(prev => prev.map((s, idx) => ({
+                        ...s,
+                        status: idx === currentIndex + 1 ? 'playing' : (idx === currentIndex ? 'complete' : s.status),
+                        completed: idx === currentIndex ? true : s.completed
+                      })));
+                      setVideoStats({ current: 0, total: 1 });
+                  }
+                }}
+              >
+                {isLast ? 'Take Assessment' : 'Next Lesson'}
+                {!canProceed && <span style={{fontSize: '11px', display: 'block', opacity: 0.7}}>Watch 40% to unlock</span>}
+              </button>
+            );
+        })()}
       </div>
     </div>
   );
