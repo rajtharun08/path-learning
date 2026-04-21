@@ -459,7 +459,7 @@ async def health_check() -> dict[str, str]:
 
 @router.get("/paths/search", response_model=list[SearchResultResponse])
 async def search_paths(
-    q: str = Query(..., min_length=1, max_length=100),
+    q: str = Query("", max_length=100),
     session: AsyncSession = Depends(get_db_session),
     client: httpx.AsyncClient = Depends(get_http_client),
 ) -> list[SearchResultResponse]:
@@ -827,14 +827,28 @@ async def _calculate_path_progress(
 
     completion_results = await asyncio.gather(
         *[
-            _fetch_course_completion(client, item.playlist_id, user_id)
+            client.get(f"{settings.progress_service_base_url}/course/{item.playlist_id}/completion?user_id={user_id}")
             for item in items
         ]
     )
 
-    completed_courses = sum(1 for completed in completion_results if completed)
+    total_pct = 0.0
+    completed_courses = 0
+    for res in completion_results:
+        try:
+            data = res.json()
+            pct = data.get("completion_percentage", 0.0)
+            total_pct += pct
+            if data.get("course_completed", False):
+                completed_courses += 1
+        except:
+            pass
+
+    avg_progress = round(total_pct / total_courses, 2) if total_courses > 0 else 0.0
     remaining_courses = total_courses - completed_courses
-    progress_percentage, progress_status = _build_progress_status(
+    
+    # We use avg_progress for the UI bar
+    _, progress_status = _build_progress_status(
         completed_courses, total_courses
     )
 
@@ -856,7 +870,7 @@ async def _calculate_path_progress(
         "total_courses": total_courses,
         "completed_courses": completed_courses,
         "remaining_courses": remaining_courses,
-        "progress_percentage": progress_percentage,
+        "progress_percentage": avg_progress,
         "status": progress_status,
         "next_up": next_up
     }

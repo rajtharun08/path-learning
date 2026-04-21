@@ -8,10 +8,11 @@ export default function LearningPath() {
   const { id } = useParams();
   
   const [modules, setModules] = useState([]);
-  const [pathName, setPathName] = useState("Frontend Development");
+  const [pathName, setPathName] = useState("");
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [progressData, setProgressData] = useState(null);
-  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859'; // Simulated LoggedIn User
+  const [loading, setLoading] = useState(true);
+  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
 
   useEffect(() => {
     const fetchPathData = async () => {
@@ -55,6 +56,8 @@ export default function LearningPath() {
         }
       } catch (err) {
         console.log('Backend not available, using mock layout.', err);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -83,6 +86,33 @@ export default function LearningPath() {
        console.error("Failed to enroll", err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="learning-path">
+        <header className="page-header">
+          <div className="back-btn skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }}></div>
+          <div className="skeleton" style={{ width: '150px', height: '24px' }}></div>
+        </header>
+
+        <div className="path-header-meta">
+          <div className="skeleton" style={{ width: '200px', height: '28px', marginBottom: '12px' }}></div>
+          <div className="skeleton" style={{ width: '120px', height: '16px' }}></div>
+        </div>
+
+        <div className="progress-glass-card skeleton" style={{ height: '160px' }}></div>
+
+        <div className="curriculum">
+          <div className="skeleton" style={{ width: '140px', height: '22px', marginBottom: '20px' }}></div>
+          <div className="module-list">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="module-card skeleton" style={{ height: '100px' }}></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="learning-path">

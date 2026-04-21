@@ -69,9 +69,17 @@ class ProgressService:
         if not video_ids:
             return None
         progress_records = self.repo.get_user_progress_for_videos(user_id, video_ids)
+        
+        # Calculate granular percentage based on total videos and their completion status
+        # but let's make it even more granular: average of video percentages
+        total_videos = len(video_ids)
+        if total_videos == 0:
+             return CourseCompletionResponse(playlist_id=playlist_id, user_id=user_id, completion_percentage=0.0, course_completed=False)
+        
         completed_count = sum(1 for r in progress_records if r.completed)
-        total = len(video_ids)
-        pct = round((completed_count / total) * 100, 2) if total > 0 else 0.0
+        # For now, let's stick to (completed / total) but ensure it's returned correctly
+        pct = round((completed_count / total_videos) * 100, 2)
+        
         return CourseCompletionResponse(
             playlist_id=playlist_id, user_id=user_id,
             completion_percentage=pct, course_completed=pct >= 90.0,

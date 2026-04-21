@@ -108,7 +108,7 @@ class PathProgressResponse(BaseModel):
     total_courses: int
     completed_courses: int
     remaining_courses: int
-    progress_percentage: int
+    progress_percentage: float
     status: str
     certification_message: str
     next_up: NextUpResponse | None = None

@@ -10,6 +10,7 @@ export default function CourseDetails() {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
   const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState({
      title: "Loading Course...",
      rating: 0,
@@ -43,7 +44,8 @@ export default function CourseDetails() {
            }
         }
       })
-      .catch(err => console.log('Backend not available, using mock details.', err));
+      .catch(err => console.log('Backend not available, using mock details.', err))
+      .finally(() => setLoading(false));
 
       const enrolledCourses = JSON.parse(localStorage.getItem('enrolled_courses') || '[]');
       if(enrolledCourses.includes(courseId)) {
@@ -60,6 +62,43 @@ export default function CourseDetails() {
     }
     setIsEnrolled(true);
   };
+
+  if (loading) {
+    return (
+      <div className="course-details">
+        <header className="page-header">
+          <div className="back-btn skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }}></div>
+          <div className="skeleton" style={{ width: '150px', height: '24px' }}></div>
+        </header>
+
+        <div className="hero-img skeleton" style={{ height: '200px' }}></div>
+
+        <div className="course-header">
+          <div className="skeleton" style={{ width: '80px', height: '16px', marginBottom: '12px' }}></div>
+          <div className="skeleton" style={{ width: '250px', height: '24px', marginBottom: '16px' }}></div>
+          <div className="course-meta-large">
+             <div className="skeleton" style={{ width: '60px', height: '16px' }}></div>
+             <div className="skeleton" style={{ width: '80px', height: '16px' }}></div>
+             <div className="skeleton" style={{ width: '70px', height: '16px' }}></div>
+          </div>
+          <div className="skeleton" style={{ width: '100%', height: '48px', marginTop: '16px' }}></div>
+        </div>
+
+        <div className="tabs">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="tab skeleton" style={{ width: '80px', height: '32px' }}></div>
+            ))}
+        </div>
+
+        <div className="tab-content" style={{ padding: '24px' }}>
+          <div className="skeleton" style={{ width: '150px', height: '20px', marginBottom: '16px' }}></div>
+          <div className="skeleton" style={{ width: '100%', height: '14px', marginBottom: '8px' }}></div>
+          <div className="skeleton" style={{ width: '100%', height: '14px', marginBottom: '8px' }}></div>
+          <div className="skeleton" style={{ width: '80%', height: '14px' }}></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="course-details">
