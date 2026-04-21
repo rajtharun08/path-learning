@@ -10,6 +10,7 @@ export default function Dashboard() {
 
   const [popularCourses, setPopularCourses] = useState([]);
   const [continuePaths, setContinuePaths] = useState([]);
+  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
 
   useEffect(() => {
     // Fetch all courses using the basic list endpoint to avoid search parameter validation
@@ -40,32 +41,16 @@ export default function Dashboard() {
       });
 
     // Fetch continue paths
-    fetch('http://localhost:8006/paths/search?q=')
+    fetch(`http://localhost:8006/users/${USER_ID}/enrolled-paths?started_only=true`)
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const formatted = data.map(path => ({
-            id: path.path_id,
-            title: path.title,
-            progress: path.average_completion_rate || 50
-          }));
-          
-          const enrolled = JSON.parse(localStorage.getItem('enrolled_paths') || '[]');
-          if (enrolled.length > 0) {
-              setContinuePaths(formatted.filter(p => enrolled.includes(p.id)));
-          } else {
-              setContinuePaths([]);
-          }
+        if (Array.isArray(data)) {
+          setContinuePaths(data);
         }
       })
       .catch(err => {
-         console.log('Backend offline, using mock paths.', err);
-         const enrolled = JSON.parse(localStorage.getItem('enrolled_paths') || '[]');
-         const mock = [
-            { id: '11111111-1111-4111-a111-111111111111', title: 'Frontend Development', progress: 40 },
-            { id: '22222222-2222-4222-a222-222222222222', title: 'Python Developer', progress: 10 }
-         ];
-         setContinuePaths(enrolled.length > 0 ? mock.filter(m => enrolled.includes(m.id)) : []);
+         console.log('Error fetching dynamic enrolled paths:', err);
+         setContinuePaths([]);
       });
   }, []);
 
@@ -84,7 +69,7 @@ export default function Dashboard() {
         {continuePaths.length > 0 ? (
           <div className="continue-cards">
             {continuePaths.map(path => (
-              <div key={path.id} className="continue-card" onClick={() => navigate(`/path/${path.id}`)}>
+              <div key={path.path_id} className="continue-card" onClick={() => navigate(`/path/${path.path_id}`)}>
                 <h3>{path.title}</h3>
                 <div className="progress-container">
                   <div className="progress-bar">
@@ -92,7 +77,7 @@ export default function Dashboard() {
                   </div>
                   <span className="progress-text">{path.progress || 0}% complete</span>
                 </div>
-                <button className="btn-primary small-btn" onClick={(e) => { e.stopPropagation(); navigate(`/path/${path.id}`); }}>Resume</button>
+                <button className="btn-primary small-btn" onClick={(e) => { e.stopPropagation(); navigate(`/path/${path.path_id}`); }}>Resume</button>
               </div>
             ))}
           </div>

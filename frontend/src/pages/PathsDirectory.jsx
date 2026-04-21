@@ -8,6 +8,22 @@ export default function PathsDirectory() {
   const [paths, setPaths] = useState([]);
   const [continuePaths, setContinuePaths] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
+
+  const fetchEnrolledPaths = () => {
+    fetch(`http://localhost:8006/users/${USER_ID}/enrolled-paths?started_only=true`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setContinuePaths(data);
+        }
+      })
+      .catch(err => console.error('Error fetching enrolled paths:', err));
+  };
+
+  useEffect(() => {
+    fetchEnrolledPaths();
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -31,10 +47,6 @@ export default function PathsDirectory() {
               enrollments: path.total_views || "1,234"
             }));
             setPaths(formatted);
-            // Only update continue learning on initial load (empty search)
-            if (searchQuery.trim() === '') {
-              setContinuePaths(formatted.slice(0, 2));
-            }
           } else {
             setPaths([]);
           }
@@ -47,7 +59,6 @@ export default function PathsDirectory() {
             { id: '22222222-2222-4222-a222-222222222222', title: 'Python Developer', desc: 'Zero to hero Python syllabus.', rating: 4.7, duration: '38h', enrollments: '1.8k' }
           ];
           setPaths(mock);
-          if (searchQuery.trim() === '') setContinuePaths(mock.slice(0, 2));
         });
     }, 300);
 
@@ -80,20 +91,26 @@ export default function PathsDirectory() {
 
       <section className="continue-learning">
         <h2>Continue Learning</h2>
-        <div className="continue-cards">
-          {continuePaths.map(path => (
-            <div key={`continue-${path.id}`} className="continue-card" onClick={() => navigate(`/path/${path.id}`)}>
-              <h3>{path.title}</h3>
-              <div className="progress-container">
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: '70%' }}></div>
+        {continuePaths.length > 0 ? (
+          <div className="continue-cards">
+            {continuePaths.map(path => (
+              <div key={`continue-${path.path_id}`} className="continue-card" onClick={() => navigate(`/path/${path.path_id}`)}>
+                <h3>{path.title}</h3>
+                <div className="progress-container">
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${path.progress}%` }}></div>
+                  </div>
+                  <span className="progress-text">{path.progress}% complete</span>
                 </div>
-                <span className="progress-text">70% complete</span>
+                <button className="btn-primary small-btn">Resume</button>
               </div>
-              <button className="btn-primary small-btn">Resume</button>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: '24px', background: 'white', borderRadius: '12px', border: '1px solid var(--border-light-2)', textAlign: 'center' }}>
+             <p style={{ color: 'var(--text-silver)', fontSize: '13px', margin: '0 0 16px 0'}}>You are not currently enrolled in any paths. Start exploring below!</p>
+          </div>
+        )}
       </section>
 
       <div className="paths-list">

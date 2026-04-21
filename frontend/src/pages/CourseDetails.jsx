@@ -109,7 +109,7 @@ export default function CourseDetails() {
         {activeTab === 'Overview' && (
           <div className="overview">
             <h3>About this course</h3>
-            <p>{course.desc}</p>
+            <p style={{whiteSpace: 'pre-line', lineHeight: '1.6', fontSize: '14px', color: 'var(--text-silver)', marginBottom: '24px'}}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</p>
             
             <h3>Instructor</h3>
             <div className="instructor">

@@ -41,6 +41,15 @@ class ProgressService:
             resume_at_seconds=resume_ts,
         )
 
+    def toggle_bookmark(self, user_id: str, video_id: str) -> bool:
+        return self.repo.toggle_bookmark(user_id, video_id)
+
+    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int):
+        return self.repo.create_note(user_id, video_id, content, video_timestamp)
+
+    def get_video_notes(self, user_id: str, video_id: str):
+        return self.repo.get_notes_for_video(user_id, video_id)
+
     def get_course_progress(self, playlist_id: str, user_id: str) -> Optional[CourseProgressResponse]:
         video_ids = get_playlist_video_ids(playlist_id)
         if not video_ids:
@@ -101,6 +110,7 @@ class ProgressService:
             record = progress_by_video.get(video_id)
             watched_seconds = record.watched_seconds if record else 0
             completed = bool(record.completed) if record else False
+            is_bookmarked = bool(record.is_bookmarked) if record else False
             status = (
                 "completed"
                 if completed
@@ -118,6 +128,7 @@ class ProgressService:
                     position=int(video.get("position") or index),
                     watched_seconds=watched_seconds,
                     completed=completed,
+                    is_bookmarked=is_bookmarked,
                     resume_at_seconds=0 if completed else watched_seconds,
                     status=status,
                 )

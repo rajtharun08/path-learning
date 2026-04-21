@@ -10,6 +10,7 @@ from app.controllers.progress_controller import ProgressController
 from app.schemas.progress import (
     CourseCompletionResponse, CourseProgressResponse,
     CourseDetailResponse, ProgressResponse, ProgressUpdateRequest, ResumeResponse,
+    BookmarkToggleRequest, NoteCreateRequest, NoteResponse
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -44,6 +45,26 @@ def update_progress(request: Request, payload: ProgressUpdateRequest, background
 @limiter.limit("100/minute")
 def resume_video(request: Request, video_id: str, user_id: str, db: Session = Depends(get_db)):
     return ProgressController(db).resume_video(video_id, user_id)
+
+
+@router.post("/video/bookmark")
+@limiter.limit("100/minute")
+def toggle_bookmark(request: Request, payload: BookmarkToggleRequest, db: Session = Depends(get_db)):
+    return ProgressController(db).toggle_bookmark(payload.user_id, payload.video_id)
+
+
+@router.post("/video/notes", response_model=NoteResponse)
+@limiter.limit("50/minute")
+def create_note(request: Request, payload: NoteCreateRequest, db: Session = Depends(get_db)):
+    return ProgressController(db).create_note(
+        payload.user_id, payload.video_id, payload.content, payload.video_timestamp
+    )
+
+
+@router.get("/video/notes/{video_id}", response_model=list[NoteResponse])
+@limiter.limit("100/minute")
+def get_video_notes(request: Request, video_id: str, user_id: str, db: Session = Depends(get_db)):
+    return ProgressController(db).get_video_notes(user_id, video_id)
 
 
 @router.get("/course/{playlist_id}/progress", response_model=CourseProgressResponse)

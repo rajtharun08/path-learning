@@ -49,6 +49,7 @@ class PathItemResponse(BaseModel):
     playlist_id: str
     sequence_order: int = 0
     title: str | None = None
+    description: str | None = None
     thumbnail: str | None = None
     duration: str | None = None
     content_status: str = "available"
@@ -116,6 +117,15 @@ class PathProgressResponse(BaseModel):
 class SearchResultResponse(PathResponse):
     total_score: float
     course_count: int
+
+
+class EnrolledPathResponse(BaseModel):
+    path_id: uuid.UUID
+    title: str
+    progress: float
+    status: str
+    total_courses: int
+    completed_courses: int
 
 
 class LearningHistoryResponse(BaseModel):

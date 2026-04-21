@@ -14,9 +14,10 @@ from app.config import get_settings
 from app.database import get_db_session
 from app.models import LearningHistory, LearningPath, PathEnrollment, PathItem
 from app.schemas import (
+    CourseDetailResponse,
+    EnrolledPathResponse,
     EnrollmentCreate,
     EnrollmentResponse,
-    CourseDetailResponse,
     LearningHistoryResponse,
     NextUpResponse,
     PathCreate,
@@ -172,6 +173,7 @@ async def _fetch_course_metadata(
 
         return {
             "title": payload.get("title"),
+            "description": payload.get("description"),
             "thumbnail": thumbnail,
             "duration": formatted_duration,
             "total_videos": len(videos),
@@ -240,6 +242,7 @@ async def _fetch_course_detail(
         return {
             "playlist_id": playlist_id,
             "title": metadata.get("title"),
+            "description": metadata.get("description"),
             "thumbnail": metadata.get("thumbnail"),
             "duration": metadata.get("duration"),
             "content_status": metadata.get("content_status", "available"),
@@ -287,6 +290,7 @@ async def _fetch_course_detail(
     return {
         "playlist_id": playlist_id,
         "title": metadata.get("title"),
+        "description": metadata.get("description"),
         "thumbnail": metadata.get("thumbnail"),
         "duration": metadata.get("duration"),
         "content_status": metadata.get("content_status", "available"),
@@ -802,28 +806,24 @@ async def enroll_user(
     return enrollment
 
 
-@router.get("/paths/{path_id}/progress", response_model=PathProgressResponse)
-async def get_path_progress(
-    path_id: uuid.UUID,
+async def _calculate_path_progress(
     user_id: uuid.UUID,
-    session: AsyncSession = Depends(get_db_session),
-    client: httpx.AsyncClient = Depends(get_http_client),
-) -> PathProgressResponse:
-    await _get_learning_path_or_404(session, path_id)
+    path_id: uuid.UUID,
+    session: AsyncSession,
+    client: httpx.AsyncClient
+) -> dict:
     items = await _get_ordered_path_items(session, path_id)
-
     total_courses = len(items)
+    
     if total_courses == 0:
-        return PathProgressResponse(
-            path_id=path_id,
-            total_courses=0,
-            completed_courses=0,
-            remaining_courses=0,
-            progress_percentage=0,
-            status="not_started",
-            certification_message="This learning path does not have any courses yet.",
-            next_up=None,
-        )
+        return {
+            "total_courses": 0,
+            "completed_courses": 0,
+            "remaining_courses": 0,
+            "progress_percentage": 0,
+            "status": "not_started",
+            "next_up": None
+        }
 
     completion_results = await asyncio.gather(
         *[
@@ -851,33 +851,82 @@ async def get_path_progress(
             playlist_id=next_item.playlist_id,
             title=metadata.get("title"),
         )
+    
+    return {
+        "total_courses": total_courses,
+        "completed_courses": completed_courses,
+        "remaining_courses": remaining_courses,
+        "progress_percentage": progress_percentage,
+        "status": progress_status,
+        "next_up": next_up
+    }
 
+
+@router.get("/paths/{path_id}/progress", response_model=PathProgressResponse)
+async def get_path_progress(
+    path_id: uuid.UUID,
+    user_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+    client: httpx.AsyncClient = Depends(get_http_client),
+) -> PathProgressResponse:
+    await _get_learning_path_or_404(session, path_id)
+    
+    progress_data = await _calculate_path_progress(user_id, path_id, session, client)
+    
     await _record_learning_history(
         session,
         user_id=user_id,
         path_id=path_id,
         event_type="progress_updated",
-        total_courses=total_courses,
-        completed_courses=completed_courses,
-        remaining_courses=remaining_courses,
-        progress_percentage=float(progress_percentage),
-        next_up_playlist_id=next_up.playlist_id if next_up else None,
+        total_courses=progress_data["total_courses"],
+        completed_courses=progress_data["completed_courses"],
+        remaining_courses=progress_data["remaining_courses"],
+        progress_percentage=float(progress_data["progress_percentage"]),
+        next_up_playlist_id=progress_data["next_up"].playlist_id if progress_data["next_up"] else None,
     )
 
     await _refresh_average_completion_rate(session, client, path_id)
 
     return PathProgressResponse(
         path_id=path_id,
-        total_courses=total_courses,
-        completed_courses=completed_courses,
-        remaining_courses=remaining_courses,
-        progress_percentage=progress_percentage,
-        status=progress_status,
+        **progress_data,
         certification_message=_build_certification_message(
-            completed_courses, total_courses, remaining_courses
-        ),
-        next_up=next_up,
+            progress_data["completed_courses"], progress_data["total_courses"], progress_data["remaining_courses"]
+        )
     )
+
+
+@router.get("/users/{user_id}/enrolled-paths", response_model=list[EnrolledPathResponse])
+async def get_enrolled_paths(
+    user_id: uuid.UUID,
+    started_only: bool = Query(False),
+    session: AsyncSession = Depends(get_db_session),
+    client: httpx.AsyncClient = Depends(get_http_client),
+) -> list[EnrolledPathResponse]:
+    result = await session.execute(
+        select(PathEnrollment).where(PathEnrollment.user_id == user_id)
+    )
+    enrollments = result.scalars().all()
+    
+    response = []
+    for enrollment in enrollments:
+        path = await _get_learning_path_or_404(session, enrollment.path_id)
+        progress_data = await _calculate_path_progress(user_id, enrollment.path_id, session, client)
+        
+        progress_val = float(progress_data["progress_percentage"])
+        if started_only and progress_val <= 0:
+            continue
+
+        response.append(EnrolledPathResponse(
+            path_id=path.path_id,
+            title=path.title,
+            progress=float(progress_data["progress_percentage"]),
+            status=progress_data["status"],
+            total_courses=progress_data["total_courses"],
+            completed_courses=progress_data["completed_courses"]
+        ))
+        
+    return response
 
 
 @router.get(

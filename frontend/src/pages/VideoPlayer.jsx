@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import './VideoPlayer.css';
 
 export default function VideoPlayer() {
+  const navigate = useNavigate();
   const { courseId } = useParams();
 
   const [syllabus, setSyllabus] = useState([]);
@@ -13,6 +14,10 @@ export default function VideoPlayer() {
    const [playerReady, setPlayerReady] = useState(false);
    const [videoStats, setVideoStats] = useState({ current: 0, total: 1 });
    const [lessonUnlocked, setLessonUnlocked] = useState(false);
+   const [isBookmarked, setIsBookmarked] = useState(false);
+   const [showNotesModal, setShowNotesModal] = useState(false);
+   const [noteText, setNoteText] = useState('');
+   const [videoNotes, setVideoNotes] = useState([]);
    const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
   
   // Custom YouTube Player reference
@@ -42,9 +47,13 @@ export default function VideoPlayer() {
                 nextId: data.lessons[i + 1]?.youtube_video_id || null
               };
             }));
-             if(!data.current_lesson && data.lessons[0]) {
+              if(!data.current_lesson && data.lessons[0]) {
                setCurrentVideoId(data.lessons[0].youtube_video_id);
                setCurrentLesson(data.lessons[0].title);
+               setIsBookmarked(data.lessons[0].is_bookmarked || false);
+             } else if (data.current_lesson) {
+                 const currentFromLessons = data.lessons.find(l => l.youtube_video_id === data.current_lesson.youtube_video_id);
+                 setIsBookmarked(currentFromLessons?.is_bookmarked || false);
              }
           }
         }
@@ -91,6 +100,68 @@ export default function VideoPlayer() {
     } catch(err) {
       console.log('Progress tracking error:', err);
     }
+  };
+
+  const fetchNotes = async () => {
+    if (!currentVideoId) return;
+    try {
+      const res = await fetch(`http://localhost:8003/video/notes/${currentVideoId}?user_id=${USER_ID}`);
+      const data = await res.json();
+      setVideoNotes(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotes();
+  }, [currentVideoId]);
+
+  const toggleBookmark = async () => {
+    try {
+       const res = await fetch(`http://localhost:8003/video/bookmark`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: USER_ID, video_id: currentVideoId })
+       });
+       const data = await res.json();
+       if (data.bookmarked !== undefined) {
+           setIsBookmarked(data.bookmarked);
+       }
+    } catch (err) {
+       console.error("Bookmark toggle failed", err);
+    }
+  };
+
+  const saveNote = async () => {
+      if (!noteText.trim()) return;
+      const playerEl = window.ytPlayerRef;
+      const ts = playerEl && typeof playerEl.getCurrentTime === 'function' ? Math.floor(playerEl.getCurrentTime()) : 0;
+      try {
+          await fetch(`http://localhost:8003/video/notes`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ user_id: USER_ID, video_id: currentVideoId, content: noteText, video_timestamp: ts })
+          });
+          setNoteText('');
+          setShowNotesModal(false);
+          fetchNotes();
+      } catch (err) {
+          console.error("Save note failed", err);
+      }
+  };
+
+  const handleResume = async () => {
+      try {
+          const res = await fetch(`http://localhost:8003/video/resume/${currentVideoId}?user_id=${USER_ID}`);
+          const data = await res.json();
+          const player = window.ytPlayerRef;
+          if (data.resume_at_seconds > 0 && player && typeof player.seekTo === 'function') {
+              player.seekTo(data.resume_at_seconds, true);
+          }
+      } catch (err) {
+          console.error("Resume failed", err);
+      }
   };
 
   useEffect(() => {
@@ -217,6 +288,8 @@ export default function VideoPlayer() {
                     ...s,
                     status: s.id === clickedId ? 'playing' : (s.status === 'playing' ? (s.completed ? 'complete' : 'available') : s.status)
                   })));
+                  const newlyClicked = syllabus.find(s => s.id === clickedId);
+                  setIsBookmarked(newlyClicked?.is_bookmarked || false);
                 }
               }}
               style={{ cursor: item.status !== 'locked' ? 'pointer' : 'default' }}
@@ -247,15 +320,15 @@ export default function VideoPlayer() {
         </div>
 
         <div className="action-buttons">
-          <button className="btn-icon">
+          <button className="btn-icon" onClick={() => setShowNotesModal(true)}>
             <FileText size={20} />
             Add Notes
           </button>
-          <button className="btn-icon">
-            <Bookmark size={20} />
-            Bookmark
+          <button className="btn-icon" onClick={toggleBookmark}>
+            <Bookmark size={20} fill={isBookmarked ? "currentColor" : "none"} />
+            {isBookmarked ? 'Bookmarked' : 'Bookmark'}
           </button>
-          <button className="btn-icon">
+          <button className="btn-icon" onClick={handleResume}>
             <RotateCcw size={20} />
             Resume
           </button>
@@ -286,6 +359,7 @@ export default function VideoPlayer() {
                         status: idx === currentIndex + 1 ? 'playing' : (idx === currentIndex ? 'complete' : s.status),
                         completed: idx === currentIndex ? true : s.completed
                       })));
+                      setIsBookmarked(nextLesson.is_bookmarked || false);
                       setVideoStats({ current: 0, total: 1 });
                       setLessonUnlocked(false);
                   }
@@ -297,6 +371,37 @@ export default function VideoPlayer() {
             );
         })()}
       </div>
+
+      {/* Notes Modal */}
+      {showNotesModal && (
+         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '400px' }}>
+               <h3 style={{marginTop: 0}}>Add Note</h3>
+               <textarea 
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Type your notes here..."
+                  style={{ width: '100%', height: '100px', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', marginBottom: '16px', fontFamily: 'var(--font-body)' }}
+               />
+               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowNotesModal(false)} style={{ padding: '8px 16px', background: '#e5e7eb', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={saveNote} style={{ padding: '8px 16px', background: 'var(--primary-dark)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Save Note</button>
+               </div>
+
+               {videoNotes.length > 0 && (
+                  <div style={{marginTop: '24px', maxHeight: '150px', overflowY: 'auto'}}>
+                     <h4 style={{fontSize: '14px', borderBottom: '1px solid #eee', paddingBottom: '8px'}}>Previous Notes</h4>
+                     {videoNotes.map(n => (
+                        <div key={n.id} style={{padding: '8px 0', borderBottom: '1px solid #eee'}}>
+                           <span style={{fontSize: '12px', color: 'var(--primary-dark)', fontWeight: 'bold'}}>{Math.floor(n.video_timestamp / 60)}:{String(n.video_timestamp % 60).padStart(2, '0')}</span>
+                           <p style={{margin: '4px 0 0 0', fontSize: '13px'}}>{n.content}</p>
+                        </div>
+                     ))}
+                  </div>
+               )}
+            </div>
+         </div>
+      )}
     </div>
   );
 }

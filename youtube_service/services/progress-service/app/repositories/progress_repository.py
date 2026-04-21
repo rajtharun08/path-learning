@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.video_progress import VideoProgress
 from app.models.learning_session import LearningSession
+from app.models.video_note import VideoNote
 
 
 class ProgressRepository:
@@ -34,6 +35,38 @@ class ProgressRepository:
         self.db.commit()
         self.db.refresh(record)
         return record
+
+    def toggle_bookmark(self, user_id: str, video_id: str) -> bool:
+        record = self.get_progress(user_id, video_id)
+        if record:
+            record.is_bookmarked = not record.is_bookmarked
+        else:
+            record = VideoProgress(
+                user_id=user_id, video_id=video_id,
+                is_bookmarked=True
+            )
+            self.db.add(record)
+        self.db.commit()
+        self.db.refresh(record)
+        return record.is_bookmarked
+
+    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int) -> VideoNote:
+        note = VideoNote(
+            user_id=user_id, video_id=video_id,
+            content=content, video_timestamp=video_timestamp
+        )
+        self.db.add(note)
+        self.db.commit()
+        self.db.refresh(note)
+        return note
+
+    def get_notes_for_video(self, user_id: str, video_id: str) -> List[VideoNote]:
+        return (
+            self.db.query(VideoNote)
+            .filter(VideoNote.user_id == user_id, VideoNote.video_id == video_id)
+            .order_by(VideoNote.video_timestamp.asc())
+            .all()
+        )
 
     def get_completed_video_ids_for_user(self, user_id: str) -> List[str]:
         rows = (

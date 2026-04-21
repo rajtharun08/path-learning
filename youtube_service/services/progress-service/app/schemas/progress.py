@@ -10,6 +10,28 @@ class ProgressUpdateRequest(BaseModel):
     event_type: Optional[str] = Field(default=None, description="Optional analytics event type (play, pause, seek, complete)")
 
 
+class BookmarkToggleRequest(BaseModel):
+    user_id: str = Field(...)
+    video_id: str = Field(...)
+
+
+class NoteCreateRequest(BaseModel):
+    user_id: str = Field(...)
+    video_id: str = Field(...)
+    content: str = Field(..., min_length=1)
+    video_timestamp: int = Field(..., ge=0)
+
+
+class NoteResponse(BaseModel):
+    id: str
+    user_id: str
+    video_id: str
+    content: str
+    video_timestamp: int
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
+
 class ProgressResponse(BaseModel):
     id: str
     user_id: str
@@ -50,6 +72,7 @@ class LessonProgressResponse(BaseModel):
     position: int = 0
     watched_seconds: int = 0
     completed: bool = False
+    is_bookmarked: bool = False
     resume_at_seconds: int = 0
     status: str = "not_started"
 
