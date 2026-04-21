@@ -8,87 +8,73 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('All Courses');
   const tabs = ['All Courses', 'Design', 'Development', 'Business'];
 
-  const [popularCourses, setPopularCourses] = useState([
-    {
-      id: "course-1",
-      title: "UI/UX Design Fundamentals",
-      category: "Design",
-      rating: 4.8,
-      students: "12.5k",
-      img: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
-    },
-    {
-      id: "course-2",
-      title: "React Complete Course 2024",
-      category: "Development",
-      rating: 4.9,
-      students: "18.2k",
-      img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
-    },
-    {
-      id: "course-3",
-      title: "Data Science with Python",
-      category: "Development",
-      rating: 4.7,
-      students: "9.8k",
-      img: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=600&auto=format&fit=crop"
-    }
-  ]);
+  const [popularCourses, setPopularCourses] = useState([]);
+  const [continuePaths, setContinuePaths] = useState([]);
 
   useEffect(() => {
-    // Attempt to fetch from local backend (Path Service searching / list)
-    fetch('http://localhost:8006/paths/search?q=')
+    // Fetch all courses for the list
+    fetch('http://localhost:8002/playlist/all')
       .then(res => res.json())
       .then(data => {
-        if (data && data.length > 0) {
-          // Map backend standard models to our frontend UI expectations if needed
-          const formatted = data.map(path => ({
-            id: path.path_id || path.playlist_id,
-            title: path.title,
-            category: "Development", // Mock category
-            rating: path.rating || 4.5,
-            students: "1.2k",
-            img: path.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+        if (Array.isArray(data)) {
+          const formatted = data.map(course => ({
+            id: course.id || course.playlist_id,
+            title: course.title,
+            category: "Development",
+            rating: 4.8,
+            students: "12.5k",
+            img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
           }));
           setPopularCourses(formatted);
         }
       })
-      .catch(err => console.log('Backend not available or offline, using mock layout.', err));
+      .catch(err => {
+         console.log('Backend offline or empty', err);
+         setPopularCourses([{
+            id: 'mock-1', title: 'React Complete Course 2024', category: 'Development', rating: 4.9, students: '18.2k', img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
+         }]);
+      });
+
+    // Fetch continue paths
+    fetch('http://localhost:8006/paths/search?q=')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+           setContinuePaths(data.slice(0, 2).map(p => ({
+              id: p.path_id, title: p.title
+           })));
+        } else {
+           setContinuePaths([{ id: 'mock-path', title: 'Frontend Development' }]);
+        }
+      }).catch(() => setContinuePaths([{ id: 'mock-path', title: 'Frontend Development' }]));
   }, []);
 
   return (
     <div className="dashboard">
       <header className="header">
         <h1>Welcome Back</h1>
-        <div className="search-bar">
+        <div className="search-bar" onClick={() => navigate('/search')}>
           <Search size={20} color="var(--text-silver)" />
-          <input type="text" placeholder="Search learning paths" />
+          <input type="text" placeholder="Search courses and paths..." readOnly />
         </div>
       </header>
 
       <section className="continue-learning">
         <h2>Continue Learning</h2>
+        {continuePaths.length === 0 && <p style={{ color: 'var(--text-silver)', fontSize: 14 }}>No paths found in your backend. Import a playlist to get started.</p>}
         <div className="continue-cards">
-          <div className="continue-card" onClick={() => navigate('/path/frontend-dev')}>
-            <h3>Frontend Development</h3>
-            <div className="progress-container">
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: '70%' }}></div>
+          {continuePaths.map(path => (
+            <div key={path.id} className="continue-card" onClick={() => navigate(`/path/${path.id}`)}>
+              <h3>{path.title}</h3>
+              <div className="progress-container">
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: '0%' }}></div>
+                </div>
+                <span className="progress-text">0% complete</span>
               </div>
-              <span className="progress-text">70% complete</span>
+              <button className="btn-primary small-btn">Resume</button>
             </div>
-            <button className="btn-primary small-btn">Resume</button>
-          </div>
-          <div className="continue-card">
-            <h3>Python Developer</h3>
-            <div className="progress-container">
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: '45%' }}></div>
-              </div>
-              <span className="progress-text">45% complete</span>
-            </div>
-            <button className="btn-primary small-btn">Resume</button>
-          </div>
+          ))}
         </div>
       </section>
 

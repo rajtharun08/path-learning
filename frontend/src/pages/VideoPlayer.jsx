@@ -18,7 +18,7 @@ export default function VideoPlayer() {
   const [currentLesson, setCurrentLesson] = useState('State and Lifecycle');
   
   useEffect(() => {
-    fetch(`http://localhost:8000/course/playlist-fastapi-basics/detail`)
+    fetch(`http://localhost:8002/course/playlist-fastapi-basics/detail`)
       .then(res => res.json())
       .then(data => {
         if(data && data.current_lesson) {

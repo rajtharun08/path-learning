@@ -45,8 +45,21 @@ export default function LearningPath() {
         <h1>{pathName}</h1>
       </header>
 
-      <div className="path-intro">
-        <p>You're making great progress! Keep going to complete this learning path.</p>
+      <div className="path-header-meta">
+        <h2>{pathName}</h2>
+        <span className="total-duration">Total Duration: 45h 30m</span>
+      </div>
+
+      <div className="progress-glass-card">
+        <h3>Your Progress</h3>
+        <div className="flex-between">
+           <span>Overall Completion</span>
+           <span className="percent-active">40%</span>
+        </div>
+        <div className="progress-bar-lg">
+           <div className="progress-fill-lg" style={{ width: '40%' }}></div>
+        </div>
+        <p className="encouragement">You're making great progress! Keep going to complete this learning path.</p>
       </div>
 
       <div className="curriculum">

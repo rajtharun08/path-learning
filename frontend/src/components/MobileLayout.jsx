@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { Home, Search, PlayCircle } from 'lucide-react';
+import { Home, PlayCircle } from 'lucide-react';
 import './MobileLayout.css';
 
 export default function MobileLayout() {
@@ -14,11 +14,7 @@ export default function MobileLayout() {
           <Home size={24} />
           <span>Home</span>
         </NavLink>
-        <NavLink to="/search" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Search size={24} />
-          <span>Search</span>
-        </NavLink>
-        <NavLink to="/path/enrolled" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <NavLink to="/path/frontend-dev" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <PlayCircle size={24} />
           <span>Path</span>
         </NavLink>

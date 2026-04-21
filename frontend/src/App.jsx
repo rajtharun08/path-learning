@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import LearningPath from './pages/LearningPath';
 import CourseDetails from './pages/CourseDetails';
 import VideoPlayer from './pages/VideoPlayer';
+import Search from './pages/Search';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="search" element={<Search />} />
           <Route path="path/:id" element={<LearningPath />} />
           <Route path="course/:id" element={<CourseDetails />} />
         </Route>
