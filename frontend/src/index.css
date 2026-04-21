@@ -1,0 +1,102 @@
+:root {
+  /* Hexaware Colors from Figma */
+  --primary-dark: #07125E; /* Dark Blue */
+  --accent-electric: #14CBDE; /* Electric Blue */
+  --accent-honey: #EAB000; /* Honey */
+  
+  --bg-white: #FFFFFF;
+  --bg-light: #F8F9FA;
+  --text-dark: #040D43; /* Black */
+  --text-silver: #8088A7; /* Silver */
+  
+  --border-light: #C8D0E5;
+  --border-light-2: #F4EBF2;
+  
+  /* Fonts */
+  --font-body: 'Inter', sans-serif;
+  --font-heading: 'Poppins', sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: #E5E7EB; /* Gray background outside mobile frame */
+  color: var(--text-dark);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  margin: 0;
+  color: var(--primary-dark);
+}
+
+a {
+  text-decoration: none;
+  color: var(--primary-dark);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Mobile App Frame to simulate the "Mobile Learning App UI" */
+.app-container {
+  width: 100%;
+  max-width: 414px; /* iPhone Max Width */
+  height: 100vh;
+  margin: 0 auto;
+  background: var(--bg-white);
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-height: 850px) {
+  .app-container {
+    height: 896px;
+    margin-top: 20px;
+    border-radius: 40px;
+  }
+}
+
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 90px; /* Space for bottom nav */
+}
+
+/* Utility buttons */
+.btn-primary {
+  background-color: var(--primary-dark);
+  color: var(--bg-white);
+  border: none;
+  padding: 16px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: var(--font-heading);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.btn-primary:hover {
+  background-color: #040A3B;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(7, 18, 94, 0.2);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+}

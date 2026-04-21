@@ -1,0 +1,148 @@
+.course-details {
+  padding: 0;
+}
+
+.course-details .page-header {
+  padding: 24px;
+  margin-bottom: 0px;
+}
+
+.hero-img {
+  width: 100%;
+  height: 220px;
+}
+
+.hero-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.course-header {
+  padding: 24px;
+  background: white;
+  border-bottom: 1px solid var(--border-light-2);
+}
+
+.course-header .tag {
+  background: var(--border-light-2);
+  color: var(--text-silver);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  display: inline-block;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.course-header h2 {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+.course-meta-large {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  color: var(--text-silver);
+  font-size: 14px;
+}
+
+.course-meta-large span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.course-meta-large .rating {
+  color: var(--text-dark);
+  font-weight: bold;
+}
+
+.course-details .btn-primary {
+  width: 100%;
+}
+
+.tabs {
+  display: flex;
+  background: white;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-light-2);
+}
+
+.tabs .tab {
+  flex: 1;
+  padding: 16px 0;
+  border: none;
+  background: none;
+  color: var(--text-silver);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  position: relative;
+}
+
+.tabs .tab.active {
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
+.tabs .tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--primary-dark);
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+
+.tab-content {
+  padding: 24px;
+  background: white;
+  min-height: 300px;
+}
+
+.overview h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+  margin-top: 24px;
+}
+
+.overview h3:first-child {
+  margin-top: 0;
+}
+
+.overview p {
+  color: var(--text-silver);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.instructor {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.instructor img {
+  width: 50px;
+  height: 50px;
+  border-radius: 25px;
+}
+
+.instructor-info h4 {
+  font-size: 16px;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+}
+
+.instructor-info p {
+  margin: 0;
+  font-size: 13px;
+}

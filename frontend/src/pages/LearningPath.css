@@ -1,0 +1,146 @@
+.learning-path {
+  padding: 24px;
+  padding-bottom: 100px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-dark);
+  cursor: pointer;
+  margin-right: 16px;
+  padding: 4px;
+}
+
+.page-header h1 {
+  font-size: 20px;
+}
+
+.path-intro {
+  background: white;
+  border: 1px solid var(--border-light-2);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 32px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.curriculum h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+}
+
+.module-count {
+  font-weight: 400;
+  color: var(--text-silver);
+  font-size: 16px;
+}
+
+.module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.module-card {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--border-light-2);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.module-card.playing {
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 16px rgba(7, 18, 94, 0.08);
+}
+
+.module-card.locked {
+  opacity: 0.6;
+}
+
+.module-img {
+  position: relative;
+  width: 80px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.module-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.status-icon {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-icon.success color { color: #10B981; }
+
+.module-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.module-info h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.playing-badge {
+  background: var(--primary-dark);
+  color: white;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  align-self: flex-start;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.module-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-silver);
+}
+
+.complete-text { color: #10B981; font-weight: 600; }
+.active-text { color: var(--primary-dark); font-weight: 600; }
+
+.bottom-action {
+  position: fixed;
+  bottom: 80px;
+  left: 0;
+  width: 100%;
+  padding: 16px 24px;
+  background: white;
+  border-top: 1px solid var(--border-light-2);
+  z-index: 10;
+}
