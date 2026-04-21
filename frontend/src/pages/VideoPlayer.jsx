@@ -12,6 +12,7 @@ export default function VideoPlayer() {
    const [currentVideoId, setCurrentVideoId] = useState(null);
    const [playerReady, setPlayerReady] = useState(false);
    const [videoStats, setVideoStats] = useState({ current: 0, total: 1 });
+   const [lessonUnlocked, setLessonUnlocked] = useState(false);
    const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';
   
   // Custom YouTube Player reference
@@ -36,7 +37,7 @@ export default function VideoPlayer() {
                 id: l.youtube_video_id || `temp-${i}`,
                 title: l.title || `Lesson ${i+1}`,
                 duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
-                status: l.completed ? 'complete' : (isPlaying ? 'playing' : 'locked'),
+                status: l.completed ? 'complete' : (isPlaying ? 'playing' : 'available'),
                 completed: l.completed || false,
                 nextId: data.lessons[i + 1]?.youtube_video_id || null
               };
@@ -115,7 +116,12 @@ export default function VideoPlayer() {
                 if(e.target && typeof e.target.getPlayerState === 'function') {
                    const state = e.target.getPlayerState();
                    const cur = e.target.getCurrentTime();
-                   setVideoStats(curStats => ({ ...curStats, current: cur }));
+                   const tot = e.target.getDuration() || 1;
+                   setVideoStats({ current: cur, total: tot });
+                   
+                   if (cur / tot >= 0.4) {
+                      setLessonUnlocked(true);
+                   }
                    
                    if(state === window.YT.PlayerState.PLAYING) {
                       sendProgressAnalytics('progress', cur, false);
@@ -205,6 +211,8 @@ export default function VideoPlayer() {
                   const clickedTitle = item.title;
                   setCurrentVideoId(clickedId);
                   setCurrentLesson(clickedTitle);
+                  setLessonUnlocked(false);
+                  setVideoStats({ current: 0, total: 1 });
                   setSyllabus(prev => prev.map(s => ({
                     ...s,
                     status: s.id === clickedId ? 'playing' : (s.status === 'playing' ? (s.completed ? 'complete' : 'available') : s.status)
@@ -226,13 +234,13 @@ export default function VideoPlayer() {
                 </div>
               </div>
               <div className="syllabus-trailing">
-                {item.status === 'complete' && <span className="complete-text">100%</span>}
-                {item.status === 'playing' && (
+                {item.completed && <span className="complete-text">100%</span>}
+                {item.status === 'playing' && !item.completed && (
                   <span className="active-text">
                     {Math.floor((videoStats.current / videoStats.total) * 100)}%
                   </span>
                 )}
-                {item.status === 'locked' && <span className="locked-text">0%</span>}
+                {!item.completed && item.status !== 'playing' && <span className="locked-text">0%</span>}
               </div>
             </div>
           ))}
@@ -260,7 +268,8 @@ export default function VideoPlayer() {
             const isLast = currentIndex === syllabus.length - 1;
             const progress = videoStats.current / (videoStats.total || 1);
             const currentItem = syllabus[currentIndex];
-            const canProceed = progress >= 0.4 || (currentItem && currentItem.status === 'complete'); 
+            const currentItem = syllabus[currentIndex];
+            const canProceed = lessonUnlocked || (currentItem && currentItem.completed); 
 
             return (
               <button 
@@ -268,7 +277,6 @@ export default function VideoPlayer() {
                 disabled={!canProceed}
                 onClick={() => {
                   if (isLast) {
-                      // Navigate to assessment or course complete page
                       alert('Take Assessment module coming soon!');
                   } else {
                       const nextLesson = syllabus[currentIndex + 1];
@@ -280,6 +288,7 @@ export default function VideoPlayer() {
                         completed: idx === currentIndex ? true : s.completed
                       })));
                       setVideoStats({ current: 0, total: 1 });
+                      setLessonUnlocked(false);
                   }
                 }}
               >
