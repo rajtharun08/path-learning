@@ -46,8 +46,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": "An unexpected error occurred while processing the request."
+            "detail": f"An unexpected error occurred: {str(exc)}"
         },
+        headers={"Access-Control-Allow-Origin": "*"}
     )
 
 

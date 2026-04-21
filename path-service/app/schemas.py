@@ -47,7 +47,7 @@ class PathItemsCreate(BaseModel):
 
 class PathItemResponse(BaseModel):
     playlist_id: str
-    sequence_order: int
+    sequence_order: int = 0
     title: str | None = None
     thumbnail: str | None = None
     duration: str | None = None
