@@ -155,9 +155,9 @@ Use this from the frontend when the detail page is actually viewed. This endpoin
 
 ### Get a path
 
-`GET /paths/{path_id}`
+`GET /paths/{path_id}?user_id={id}`
 
-Returns the path with enriched item metadata and the cached `average_completion_rate`.
+Returns the path with enriched item metadata and the cached `average_completion_rate`. If `user_id` is provided, the response is enriched with `is_enrolled` status and `progress_percentage` in a single request for high-performance frontend rendering.
 
 ### Enroll a user
 
@@ -171,19 +171,27 @@ Request body:
 }
 ```
 
-### Get path progress
-
-`GET /paths/{path_id}/progress?user_id={id}`
-
-Returns:
-
-- total courses
-- completed courses
-- remaining courses
-- progress percentage
-- status
-- certification message
 - next up course
+
+### Get Enrolled Paths (User Dashboard)
+
+`GET /users/{user_id}/enrolled-paths?started_only=true`
+
+Returns an array of paths that the user has enrolled in. If `started_only` is true, it filters out paths where progress is effectively 0%.
+
+Response:
+```json
+[
+  {
+    "path_id": "uuid",
+    "title": "React Mastery",
+    "progress": 45.5,
+    "status": "In Progress (2/4)",
+    "total_courses": 4,
+    "completed_courses": 2
+  }
+]
+```
 
 ### Search paths
 

@@ -56,15 +56,17 @@ graph TD
 ### YouTube Learning Platform
 - Automatic synchronization of YouTube content (playlists, videos)
 - User management and authentication
-- Progress tracking with resume functionality
-- Analytics for drop-off points and popularity metrics
+- Progress tracking with resume functionality and higher precision analytics
+- **Advanced Lesson Interaction**: Integrated note-taking and video bookmarking
+- **Granular Completion Logic**: Intelligent progress calculation based on watch-time percentage, not just binary status
 - Intelligent recommendation engine based on viewing patterns
 
 ### Path Service
 - Creation and management of learning paths (ordered collections of playlists/courses)
 - Each path item is treated as a course with detailed lesson-level progress tracking
-- Enrichment of paths with metadata from Content Service (course details, lesson sequences)
-- Progress calculation using data from Progress Service (lesson completion, current position, next actions)
+- **Smarter Path Progress**: Real-time average completion tracking across multiple courses in a path
+- **Ultra-Fast Loading**: Consolidated endpoints for fetching Path detail + Enrollment + Progress in a single network roundtrip
+- **Premium UX**: Professional **Skeleton Loaders** and shimmer animations for instantaneous perceived performance
 - Live average completion rate computation from enrolled users
 - Ranked search functionality across paths
 - User enrollment and tracking for learning paths
@@ -282,6 +284,12 @@ Searches learning paths by title and description with relevance ranking.
 GET /courses/{playlist_id}
 ```
 Returns a full course detail payload for a specific playlist, including lesson-level metadata and progress information.
+
+#### Get Enrolled Paths (Dashboard)
+```
+GET /users/{user_id}/enrolled-paths
+```
+Returns a list of paths the user has started, including their real-time progress percentages, specifically optimized for the "Continue Learning" dashboard section.
 
 ### YouTube Platform Endpoints (via API Gateway)
 

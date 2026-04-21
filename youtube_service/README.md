@@ -85,6 +85,9 @@ _Note: This service uses a Cache-First pattern. Hitting a GET endpoint for the f
 | `GET`  | `/video/resume/{video_id}?user_id={id}`         | Returns exactly what second the user left off at (or 0 if completed).                                                                                                          |
 | `GET`  | `/course/{playlist_id}/progress?user_id={id}`   | Returns course-wide stats (e.g. "Completed 3/10 videos").                                                                                                                      |
 | `GET`  | `/course/{playlist_id}/completion?user_id={id}` | Returns an assessment boolean `course_completed: true` if watched > 90%.                                                                                                       |
+| `POST` | `/video/note`                                   | `{"user_id": "uuid", "video_id": "yt_id", "content": "note text", "video_timestamp": 45}`<br>_Persists a timestamped note for a specific video._                               |
+| `GET`  | `/video/notes?user_id={user_id}&video_id={vid}`  | Returns all notes for a specific video.                                                                                                                                        |
+| `POST` | `/video/bookmark/toggle`                        | `{"user_id": "uuid", "video_id": "yt_id"}`<br>_Toggles the bookmark status for a video._                                                                                       |
 
 ### 📊 Analytics Module (`/analytics`)
 
