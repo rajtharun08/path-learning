@@ -1,0 +1,1 @@
+This folder is for your app assets (icons, splash screens). I have temporarily disabled custom assets in app.json so you can start the app without errors.
