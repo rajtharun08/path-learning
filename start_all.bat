@@ -1,28 +1,31 @@
 @echo off
+
+set BASE=C:\Users\harid\OneDrive\Desktop\new_pod\path-learning
+
 echo ===================================================
 echo   Starting Path Learning Platform...
 echo ===================================================
 
-:: 1. Start Content Service (8002)
+:: 1. Content Service (8002)
 echo Starting Content Service...
-start "Content Service (8002)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\youtube_service\services\content-service && uvicorn app.main:app --reload --port 8002"
+start "Content Service (8002)" cmd /k "call %BASE%\venv\Scripts\activate && cd /d %BASE%\youtube_service\services\content-service && uvicorn app.main:app --reload --port 8002"
 
-:: 2. Start Progress Service (8003)
+:: 2. Progress Service (8003)
 echo Starting Progress Service...
-start "Progress Service (8003)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\youtube_service\services\progress-service && uvicorn app.main:app --reload --port 8003"
+start "Progress Service (8003)" cmd /k "call %BASE%\venv\Scripts\activate && cd /d %BASE%\youtube_service\services\progress-service && uvicorn app.main:app --reload --port 8003"
 
-:: 3. Start Analytics Service (8004)
+:: 3. Analytics Service (8004)
 echo Starting Analytics Service...
-start "Analytics Service (8004)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\youtube_service\services\analytics-service && uvicorn app.main:app --reload --port 8004"
+start "Analytics Service (8004)" cmd /k "call %BASE%\venv\Scripts\activate && cd /d %BASE%\youtube_service\services\analytics-service && uvicorn app.main:app --reload --port 8004"
 
-:: 4. Start Path Service (8006) - FIXED PATH
+:: 4. Path Service (8006)
 echo Starting Path Service...
-start "Path Service (8006)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\path-service && uvicorn main:app --reload --port 8006"
+start "Path Service (8006)" cmd /k "call %BASE%\venv\Scripts\activate && cd /d %BASE%\path-service && uvicorn main:app --reload --port 8006"
 
-:: 5. Start Frontend
+:: 5. Frontend
 echo Starting Frontend...
-start "Frontend (npm run dev)" cmd /k "cd /d D:\path-learning\frontend && npm run dev"
+start "Frontend (npm run dev)" cmd /k "cd /d %BASE%\frontend && npm install && npm run dev"
 
 echo.
-echo All backend services launched!
+echo All services launched!
 pause
