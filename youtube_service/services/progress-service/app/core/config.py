@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql://postgres:Tharun%4008@localhost:5432/progress_db"
+    database_url: str = "postgresql://postgres:636982@localhost:5432/progress_db"
     content_service_url: str = "http://localhost:8002"
     service_port: int = 8003
     rate_limit_per_minute: int = 100
