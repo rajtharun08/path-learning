@@ -22,10 +22,6 @@ start "Analytics Service (8004)" cmd /k "call %BASE%\venv\Scripts\activate && cd
 echo Starting Path Service...
 start "Path Service (8006)" cmd /k "call %BASE%\venv\Scripts\activate && cd /d %BASE%\path-service && uvicorn main:app --reload --port 8006"
 
-:: 5. Frontend
-echo Starting Frontend...
-start "Frontend (npm run dev)" cmd /k "cd /d %BASE%\frontend && npm install && npm run dev"
-
 echo.
 echo All services launched!
 pause
