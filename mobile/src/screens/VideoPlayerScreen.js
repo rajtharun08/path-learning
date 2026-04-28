@@ -5,13 +5,13 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView, 
-  SafeAreaView, 
   Alert,
   Modal,
   TextInput,
   Dimensions,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { ArrowLeft, Bookmark, FileText, RotateCcw, CheckCircle2, PlayCircle, Lock, ChevronDown } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -225,7 +225,7 @@ export default function VideoPlayerScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
         <View style={styles.playerWrapper}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft color="white" size={24} />
@@ -256,7 +256,7 @@ export default function VideoPlayerScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent}>
         <View style={styles.lessonHeader}>
           <Text style={styles.lessonTitle}>{currentLesson}</Text>
           <Text style={styles.lessonMeta}>
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 800,
     backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
+    flex: 1,
     boxShadow: '0 0 20px rgba(0,0,0,0.1)',
   },
   playerWrapper: {

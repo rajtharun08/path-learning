@@ -8,9 +8,9 @@ import {
   TextInput, 
   Image, 
   ActivityIndicator,
-  SafeAreaView,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
@@ -69,8 +69,8 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
-      <ScrollView stickyHeaderIndices={[0]} showsVerticalScrollIndicator={false}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
+      <ScrollView style={{ flex: 1, width: '100%' }} stickyHeaderIndices={[0]} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.welcomeText}>Welcome Back</Text>
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 800,
     backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
+    flex: 1,
     boxShadow: '0 0 20px rgba(0,0,0,0.1)',
   },
   header: {

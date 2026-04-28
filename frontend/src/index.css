@@ -1,16 +1,23 @@
 :root {
   /* Hexaware Colors from Figma */
+  --primary-brand: #3C2CDA;
+  --primary-cta: #1D86FF;
   --primary-dark: #07125E; /* Dark Blue */
   --accent-electric: #14CBDE; /* Electric Blue */
-  --accent-honey: #EAB000; /* Honey */
+  --accent-honey: #EA9D00; /* Honey */
+  --accent-canary: #F4CB4E;
   
-  --bg-white: #FFFFFF;
-  --bg-light: #F8F9FA;
+  --bg-white: #FFFFFF; /* Snow */
+  --bg-light: #F8F8F9; /* White */
+  --bg-surface: #F4EFF2; /* Light */
+  
   --text-dark: #040D43; /* Black */
   --text-silver: #8088A7; /* Silver */
   
-  --border-light: #C8D0E5;
-  --border-light-2: #F4EBF2;
+  --border-light: #CBD0E5;
+  --border-dark: #535983;
+  
+  --status-error: #DA2D2C;
   
   /* Fonts */
   --font-body: 'Inter', sans-serif;

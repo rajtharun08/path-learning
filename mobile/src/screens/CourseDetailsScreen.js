@@ -3,12 +3,13 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+  TouchableOpacity,
   Image, 
   ActivityIndicator,
-  SafeAreaView
+  Platform,
+  ScrollView
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // ✅ added
 import { ArrowLeft, Star, Clock } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,8 @@ import { API_URLS, USER_ID } from '../constants/Config';
 export default function CourseDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets(); // ✅ added
+
   const { courseId } = route.params || { courseId: 'playlist-fastapi-basics' };
   
   const [activeTab, setActiveTab] = useState('Overview');
@@ -102,93 +105,103 @@ export default function CourseDetailsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={24} color={Colors.primaryDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Course Details</Text>
-      </View>
+    <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+        
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 20 } // ✅ FIX
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Image source={{ uri: course.img }} style={styles.heroImage} />
-
-        <View style={styles.courseHeader}>
-          <View style={styles.tagWrapper}>
-            <Text style={styles.tag}>Development</Text>
-          </View>
-          <Text style={styles.title}>{course.title}</Text>
-          
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Star size={16} fill={Colors.accentHoney} color={Colors.accentHoney} />
-              <Text style={styles.metaText}> {course.rating}</Text>
-            </View>
-            <Text style={styles.metaText}>{course.students} students</Text>
-            <View style={styles.metaItem}>
-              <Clock size={16} color={Colors.textSilver} />
-              <Text style={styles.metaText}> {course.duration}</Text>
-            </View>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ArrowLeft size={24} color={Colors.primaryDark} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Course Details</Text>
           </View>
 
-          {isEnrolled ? (
-            <TouchableOpacity 
-              style={[styles.enrollBtn, {backgroundColor: Colors.accentHoney}]}
-              onPress={() => navigation.navigate('VideoPlayer', { courseId })}
-            >
-              <Text style={[styles.enrollBtnText, {color: Colors.textDark}]}>Resume Course</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={styles.enrollBtn}
-              onPress={handleCourseEnroll}
-            >
-              <Text style={styles.enrollBtnText}>Enroll in Course</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          <Image source={{ uri: course.img }} style={styles.heroImage} />
 
-        <View style={styles.tabs}>
-          {['Overview', 'Lessons', 'Reviews'].map(tab => (
-            <TouchableOpacity 
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.activeTab]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.tabContent}>
-          {activeTab === 'Overview' && (
-            <View style={styles.overview}>
-              <Text style={styles.subTitle}>About this course</Text>
-              <Text style={styles.desc}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</Text>
-              
-              <Text style={styles.subTitle}>Instructor</Text>
-              <View style={styles.instructor}>
-                <Image source={{ uri: "https://ui-avatars.com/api/?name=Mike+Chen&background=07125E&color=fff" }} style={styles.instructorImg} />
-                <View style={styles.instructorInfo}>
-                  <Text style={styles.instructorName}>Mike Chen</Text>
-                  <Text style={styles.instructorRole}>React Developer</Text>
-                </View>
+          <View style={styles.courseHeader}>
+            <View style={styles.tagWrapper}>
+              <Text style={styles.tag}>Development</Text>
+            </View>
+            <Text style={styles.title}>{course.title}</Text>
+            
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Star size={16} fill={Colors.accentHoney} color={Colors.accentHoney} />
+                <Text style={styles.metaText}> {course.rating}</Text>
+              </View>
+              <Text style={styles.metaText}>{course.students} students</Text>
+              <View style={styles.metaItem}>
+                <Clock size={16} color={Colors.textSilver} />
+                <Text style={styles.metaText}> {course.duration}</Text>
               </View>
             </View>
-          )}
-          
-          {activeTab === 'Lessons' && (
-             <View style={styles.overview}>
-               {!isEnrolled ? (
-                 <View style={styles.lockedState}>
-                   <Text style={styles.lockedTitle}>Content Locked</Text>
-                   <Text style={styles.lockedText}>Please enroll in the course to view the full curriculum map.</Text>
-                   <TouchableOpacity style={styles.smallEnrollBtn} onPress={handleCourseEnroll}>
-                     <Text style={styles.smallEnrollBtnText}>Enroll</Text>
-                   </TouchableOpacity>
-                 </View>
-               ) : (
-                 <View style={styles.lessonsList}>
+
+            {isEnrolled ? (
+              <TouchableOpacity 
+                style={[styles.enrollBtn, {backgroundColor: Colors.accentHoney}]}
+                onPress={() => navigation.navigate('VideoPlayer', { courseId })}
+              >
+                <Text style={[styles.enrollBtnText, {color: Colors.textDark}]}>Resume Course</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.enrollBtn}
+                onPress={handleCourseEnroll}
+              >
+                <Text style={styles.enrollBtnText}>Enroll in Course</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.tabs}>
+            {['Overview', 'Lessons', 'Reviews'].map(tab => (
+              <TouchableOpacity 
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.activeTab]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.tabContent}>
+            {activeTab === 'Overview' && (
+              <View style={styles.overview}>
+                <Text style={styles.subTitle}>About this course</Text>
+                <Text style={styles.desc}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</Text>
+                
+                <Text style={styles.subTitle}>Instructor</Text>
+                <View style={styles.instructor}>
+                  <Image source={{ uri: "https://ui-avatars.com/api/?name=Mike+Chen&background=07125E&color=fff" }} style={styles.instructorImg} />
+                  <View style={styles.instructorInfo}>
+                    <Text style={styles.instructorName}>Mike Chen</Text>
+                    <Text style={styles.instructorRole}>React Developer</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {activeTab === 'Lessons' && (
+              <View style={styles.overview}>
+                {!isEnrolled ? (
+                  <View style={styles.lockedState}>
+                    <Text style={styles.lockedTitle}>Content Locked</Text>
+                    <Text style={styles.lockedText}>Please enroll in the course to view the full curriculum map.</Text>
+                    <TouchableOpacity style={styles.smallEnrollBtn} onPress={handleCourseEnroll}>
+                      <Text style={styles.smallEnrollBtnText}>Enroll</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.lessonsList}>
                     {lessons.map((lesson, idx) => (
                       <TouchableOpacity 
                         key={lesson.id} 
@@ -204,32 +217,50 @@ export default function CourseDetailsScreen() {
                         </View>
                       </TouchableOpacity>
                     ))}
-                 </View>
-               )}
-             </View>
-          )}
+                  </View>
+                )}
+              </View>
+            )}
 
-          {activeTab === 'Reviews' && (
-             <View style={styles.overview}>
-               <Text style={styles.desc}>4.8 out of 5 stars based on 1,200 reviews</Text>
-             </View>
-          )}
-        </View>
-      </ScrollView>
+            {activeTab === 'Reviews' && (
+              <View style={styles.overview}>
+                <Text style={styles.desc}>4.8 out of 5 stars based on 1,200 reviews</Text>
+              </View>
+            )}
+          </View>
+
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
+
 const styles = StyleSheet.create({
-  container: {
+ container: {
     flex: 1,
     backgroundColor: Colors.bgWhite,
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+  },
+  webContainer: {
+    backgroundColor: '#f0f2f5',
+  },
+  webContentWrapper: {
+    width: '100%',
+    maxWidth: 800,
+    backgroundColor: Colors.bgWhite,
+    flex: 1,
+    boxShadow: '0 0 20px rgba(0,0,0,0.1)',
+  },
+  scrollContent: {
+    flexGrow: 1, // ✅ updated
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',

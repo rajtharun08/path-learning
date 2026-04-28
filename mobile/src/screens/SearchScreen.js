@@ -7,9 +7,9 @@ import {
   TextInput, 
   ScrollView, 
   Image, 
-  ActivityIndicator,
-  SafeAreaView
+  ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star, ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
@@ -75,7 +75,7 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.resultsContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.resultsContainer} showsVerticalScrollIndicator={false}>
         {loading && (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={Colors.primaryDark} />

@@ -5,11 +5,11 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   TextInput, 
-  ScrollView, 
-  SafeAreaView,
+  ScrollView,
   ActivityIndicator,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
@@ -74,12 +74,12 @@ export default function PathsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Paths Directory</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.topSection}>
           <Text style={styles.subtitle}>Track your learning progress and continue where you left off. Stay on track with your learning goals.</Text>
           
@@ -183,11 +183,15 @@ const styles = StyleSheet.create({
   webContainer: {
     backgroundColor: '#f0f2f5',
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
   webContentWrapper: {
     width: '100%',
     maxWidth: 800,
     backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
+    flex: 1,
     boxShadow: '0 0 20px rgba(0,0,0,0.1)',
   },
   header: {

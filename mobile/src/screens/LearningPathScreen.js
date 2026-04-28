@@ -6,9 +6,9 @@ import {
   TouchableOpacity, 
   ScrollView, 
   Image, 
-  ActivityIndicator,
-  SafeAreaView
+  ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, PlayCircle } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -107,14 +107,14 @@ export default function LearningPathScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={24} color={Colors.primaryDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{pathName}</Text>
-      </View>
+      <ScrollView style={{ flex: 1, width: '100%' }} stickyHeaderIndices={[0]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ArrowLeft size={24} color={Colors.primaryDark} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{pathName}</Text>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.pathHeaderMeta}>
           <Text style={styles.mainTitle}>{pathName}</Text>
           <Text style={styles.totalDuration}>Total Duration: 45h 30m</Text>

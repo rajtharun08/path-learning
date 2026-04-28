@@ -5,6 +5,9 @@ import './MobileLayout.css';
 export default function MobileLayout() {
   return (
     <div className="app-container">
+      <header style={{ padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #eee' }}>
+        <h1 style={{ color: '#07125E', fontSize: '22px', fontWeight: 'bold', fontStyle: 'italic', margin: 0, textAlign: 'left' }}>Hexaware liminous</h1>
+      </header>
       <div className="scroll-content">
         <Outlet />
       </div>
