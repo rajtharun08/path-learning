@@ -30,18 +30,26 @@ class ContentRepository:
         title: str,
         description: str,
         videos_data: List[dict],
+        thumbnail: Optional[str] = None,
+        author_name: Optional[str] = None,
     ) -> Playlist:
         playlist = self.get_playlist_by_youtube_id(youtube_playlist_id)
 
         if playlist:
             playlist.title = title
             playlist.description = description
+            if thumbnail is not None:
+                playlist.thumbnail = thumbnail
+            if author_name is not None:
+                playlist.author_name = author_name
             playlist.last_synced_at = datetime.now(timezone.utc)
         else:
             playlist = Playlist(
                 youtube_playlist_id=youtube_playlist_id,
                 title=title,
                 description=description,
+                thumbnail=thumbnail,
+                author_name=author_name,
             )
             self.db.add(playlist)
             self.db.flush()

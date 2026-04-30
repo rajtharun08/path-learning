@@ -60,6 +60,7 @@ class PathItemResponse(BaseModel):
     course_completed: bool = False
     next_action_type: str = "next_lesson"
     next_action_label: str = "Next Lesson"
+    author_name: str | None = None
 
 
 class CourseLessonResponse(BaseModel):

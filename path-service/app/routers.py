@@ -256,6 +256,7 @@ async def _fetch_course_detail(
             "current_lesson": current_lesson,
             "next_lesson": next_lesson,
             "lessons": lessons,
+            "author_name": metadata.get("author_name"),
         }
 
     url = (

@@ -7,9 +7,9 @@ import {
   TextInput, 
   ScrollView, 
   Image, 
-  ActivityIndicator,
-  SafeAreaView
+  ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star, ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
@@ -61,10 +61,10 @@ export default function SearchScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={24} color={Colors.primaryDark} />
+          <ArrowLeft size={24} color={Colors.navy} />
         </TouchableOpacity>
         <View style={styles.searchBar}>
-          <SearchIcon size={20} color={Colors.textSilver} />
+          <SearchIcon size={20} color={Colors.silver} />
           <TextInput 
             style={styles.searchInput}
             placeholder="Search all content..." 
@@ -75,10 +75,10 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.resultsContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.resultsContainer} showsVerticalScrollIndicator={false}>
         {loading && (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color={Colors.primaryDark} />
+            <ActivityIndicator size="large" color={Colors.brandBlue} />
             <Text style={styles.statusText}>Searching...</Text>
           </View>
         )}
@@ -101,7 +101,7 @@ export default function SearchScreen() {
               <Text style={styles.courseTitle}>{course.title}</Text>
               <View style={styles.courseMeta}>
                 <View style={styles.ratingRow}>
-                  <Star size={14} fill={Colors.accentHoney} color={Colors.accentHoney} />
+                  <Star size={14} fill={Colors.canary} color={Colors.canary} />
                   <Text style={styles.ratingText}> {course.rating}</Text>
                 </View>
                 <Text style={styles.studentsText}>{course.students} students</Text>
@@ -114,17 +114,25 @@ export default function SearchScreen() {
   );
 }
 
+const luminoShadow = {
+  shadowColor: '#040D43',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
     gap: 12,
   },
   backBtn: {
@@ -134,18 +142,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
     fontSize: 16,
-    color: Colors.textDark,
+    color: Colors.navy,
+    fontFamily: 'Inter_400Regular',
   },
   resultsContainer: {
     padding: 16,
@@ -157,21 +166,18 @@ const styles = StyleSheet.create({
   },
   statusText: {
     marginTop: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
     fontSize: 14,
+    fontFamily: 'Inter_500Medium',
   },
   courseCard: {
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...luminoShadow,
   },
   courseImage: {
     width: '100%',
@@ -182,14 +188,14 @@ const styles = StyleSheet.create({
   },
   courseCat: {
     fontSize: 12,
-    color: Colors.primaryDark,
-    fontWeight: 'bold',
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
     marginBottom: 4,
   },
   courseTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 8,
   },
   courseMeta: {
@@ -203,11 +209,12 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 12,
-    color: Colors.textDark,
-    fontWeight: '600',
+    color: Colors.navy,
+    fontFamily: 'Inter_600SemiBold',
   },
   studentsText: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
 });

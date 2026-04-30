@@ -10,7 +10,10 @@ from app.schemas.content import (
     PlaylistResponse,
     PlaylistSearchResultResponse,
     VideoMetadataResponse,
+    PlaylistCreate,
+    PlaylistUpdate
 )
+from fastapi import HTTPException
 
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["Content"])
@@ -20,6 +23,18 @@ router = APIRouter(tags=["Content"])
 @limiter.limit("100/minute")
 def list_playlists(request: Request, pagination: PaginationParams = Depends(), db: Session = Depends(get_db)):
     return ContentController(db).list_playlists(pagination)
+
+
+@router.post("/playlist", response_model=PlaylistResponse)
+@limiter.limit("50/minute")
+def create_playlist(request: Request, payload: PlaylistCreate, db: Session = Depends(get_db)):
+    return ContentController(db).create_playlist(payload)
+
+
+@router.put("/playlist/{playlist_id}", response_model=PlaylistResponse)
+@limiter.limit("50/minute")
+def update_playlist(request: Request, playlist_id: str, payload: PlaylistUpdate, db: Session = Depends(get_db)):
+    return ContentController(db).update_playlist(playlist_id, payload)
 
 
 @router.get("/playlist/search", response_model=PaginatedResponse[PlaylistSearchResultResponse])

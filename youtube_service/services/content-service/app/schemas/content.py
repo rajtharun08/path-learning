@@ -14,11 +14,26 @@ class VideoResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PlaylistCreate(BaseModel):
+    youtube_playlist_id: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    thumbnail: Optional[str] = None
+    author_name: Optional[str] = None
+
+class PlaylistUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    thumbnail: Optional[str] = None
+    author_name: Optional[str] = None
+
 class PlaylistResponse(BaseModel):
     id: str
     youtube_playlist_id: str
     title: str
     description: Optional[str]
+    thumbnail: Optional[str] = None
+    author_name: Optional[str] = None
     last_synced_at: datetime
     videos: List[VideoResponse] = Field(default_factory=list)
 

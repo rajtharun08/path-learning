@@ -5,16 +5,17 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView, 
-  SafeAreaView, 
   Alert,
   Modal,
   TextInput,
   Dimensions,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { ArrowLeft, Bookmark, FileText, RotateCcw, CheckCircle2, PlayCircle, Lock, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, FileText, CheckCircle2, PlayCircle, Lock, ChevronDown, Check, Play, AlignLeft } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
 import { API_URLS, USER_ID } from '../constants/Config';
 
@@ -36,6 +37,7 @@ export default function VideoPlayerScreen() {
   const [noteText, setNoteText] = useState('');
   const [videoNotes, setVideoNotes] = useState([]);
   const [playing, setPlaying] = useState(true);
+  const [activeTab, setActiveTab] = useState('Overview');
 
   const playerRef = useRef();
 
@@ -113,6 +115,14 @@ export default function VideoPlayerScreen() {
       console.log('Progress tracking error:', err);
     }
   };
+
+  useEffect(() => {
+    if (syllabus.length > 0) {
+      const completedCount = syllabus.filter(s => s.completed).length;
+      const pct = (completedCount / syllabus.length) * 100;
+      setCourseProgress(Number.isInteger(pct) ? pct : parseFloat(pct.toFixed(2)));
+    }
+  }, [syllabus]);
 
   const onStateChange = useCallback((state) => {
     if (state === "ended") {
@@ -225,7 +235,7 @@ export default function VideoPlayerScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
         <View style={styles.playerWrapper}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft color="white" size={24} />
@@ -256,47 +266,69 @@ export default function VideoPlayerScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent}>
         <View style={styles.lessonHeader}>
-          <Text style={styles.lessonTitle}>{currentLesson}</Text>
-          <Text style={styles.lessonMeta}>
+          <Text style={styles.lessonSubtitle}>
             Lesson {syllabus.findIndex(s => s.id === currentVideoId) + 1} of {syllabus.length}
           </Text>
+          <Text style={styles.lessonTitle}>{currentLesson}</Text>
+          <View style={styles.metaRow}>
+             <View style={styles.statusTag}><Text style={styles.statusTagText}>In Progress</Text></View>
+             <Text style={styles.lessonMeta}>10:22  ·  1,234 views</Text>
+          </View>
           
           <View style={styles.courseProgress}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Course Progress</Text>
-              <Text style={styles.progressValue}>{courseProgress}% completed</Text>
-            </View>
-            <View style={styles.progressBarLarge}>
-              <View style={[styles.progressFillLarge, { width: `${courseProgress}%` }]} />
-            </View>
+             <View style={styles.progressCircleContainer}>
+                <View style={styles.progressRing}>
+                   <View style={styles.progressInnerRing}>
+                      <Text style={styles.progressPercentage}>{courseProgress}%</Text>
+                   </View>
+                </View>
+                <View style={styles.progressTextContainer}>
+                   <Text style={styles.progressLabel}>Course Progress</Text>
+                   <Text style={styles.progressValue}>You've watched {Math.round((courseProgress/100) * syllabus.length)} of {syllabus.length} lessons</Text>
+                </View>
+             </View>
+             <TouchableOpacity style={styles.viewCourseChip}>
+                 <Text style={styles.viewCourseText}>View Course &gt;</Text>
+             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => setShowNotesModal(true)}>
-            <FileText size={20} color={Colors.primaryDark} />
-            <Text style={styles.actionBtnText}>Notes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={toggleBookmark}>
-            <Bookmark size={20} color={isBookmarked ? Colors.accentHoney : Colors.primaryDark} fill={isBookmarked ? Colors.accentHoney : 'none'} />
-            <Text style={styles.actionBtnText}>{isBookmarked ? 'Saved' : 'Save'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleResume}>
-            <RotateCcw size={20} color={Colors.primaryDark} />
-            <Text style={styles.actionBtnText}>Resume</Text>
-          </TouchableOpacity>
+        <View style={styles.tabsRow}>
+           <TouchableOpacity style={[styles.tabItem, activeTab === 'Overview' && styles.activeTabItem]} onPress={() => setActiveTab('Overview')}>
+              <Text style={[styles.tabText, activeTab === 'Overview' && styles.activeTabText]}>Overview</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={[styles.tabItem, activeTab === 'Notes' && styles.activeTabItem]} onPress={() => setActiveTab('Notes')}>
+              <Text style={[styles.tabText, activeTab === 'Notes' && styles.activeTabText]}>Notes</Text>
+              <View style={styles.badge}><Text style={styles.badgeText}>{videoNotes.length}</Text></View>
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.tabItem} disabled>
+              <Text style={styles.tabText}>Resources</Text>
+           </TouchableOpacity>
         </View>
 
+        {activeTab === 'Overview' ? (
         <View style={styles.syllabusSection}>
           <Text style={styles.subTitle}>Course Syllabus</Text>
           {syllabus.map((item, idx) => (
             <TouchableOpacity 
               key={item.id} 
               style={[styles.syllabusItem, item.id === currentVideoId && styles.activeSyllabusItem]}
-              onPress={() => {
+              onPress={async () => {
                 if (item.status !== 'locked') {
+                  const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
+                  const currentItem = syllabus[currentIndex];
+                  
+                  if (currentItem && !currentItem.completed) {
+                     await sendProgressAnalytics('complete', videoStats.current || 0, true);
+                     setSyllabus(prev => prev.map((s, idx) => ({
+                        ...s,
+                        status: idx === currentIndex ? 'complete' : s.status,
+                        completed: idx === currentIndex ? true : s.completed
+                     })));
+                  }
+
                   setCurrentVideoId(item.id);
                   setCurrentLesson(item.title);
                   setLessonUnlocked(false);
@@ -304,52 +336,108 @@ export default function VideoPlayerScreen() {
               }}
             >
               <View style={styles.statusIconWrapper}>
-                {item.status === 'complete' && <CheckCircle2 size={24} color="#10B981" />}
-                {item.id === currentVideoId && <PlayCircle size={24} color={Colors.primaryDark} />}
-                {item.status === 'locked' && <Lock size={20} color={Colors.textSilver} />}
-                {item.status === 'available' && item.id !== currentVideoId && <View style={styles.dot} />}
+                {item.id === currentVideoId ? (
+                  <View style={styles.activeIconCircle}><Play size={14} color={Colors.brandBlue} fill={Colors.brandBlue} /></View>
+                ) : item.status === 'complete' ? (
+                  <View style={styles.completedIconCircle}><Text style={styles.circleNumber}>{idx + 1}</Text></View>
+                ) : item.status === 'locked' ? (
+                  <View style={styles.lockedIconCircle}><Lock size={14} color={Colors.silver} /></View>
+                ) : (
+                  <View style={styles.inactiveIconCircle}><Text style={styles.circleNumber}>{idx + 1}</Text></View>
+                )}
               </View>
               <View style={styles.syllabusInfo}>
-                <Text style={styles.syllabusTitle}>{item.title}</Text>
-                <Text style={styles.syllabusMetaText}>{item.duration}</Text>
-              </View>
-              {item.id === currentVideoId && (
-                <Text style={styles.percentageText}>
-                  {Math.floor((videoStats.current / videoStats.total) * 100)}%
+                <Text style={[styles.syllabusTitle, item.id === currentVideoId && {color: Colors.silver}]}>{item.title}</Text>
+                <Text style={[styles.syllabusMetaText, item.id === currentVideoId && {color: Colors.brandBlue, fontWeight: '600'}]}>
+                   {item.id === currentVideoId ? `${item.duration}  ·  Now Playing` : item.duration}
                 </Text>
-              )}
+              </View>
+              <View style={styles.syllabusRightAction}>
+                {item.status === 'complete' && <CheckCircle2 size={20} color="#10B981" />}
+                {item.id === currentVideoId && <AlignLeft size={20} color={Colors.brandBlue} />}
+              </View>
             </TouchableOpacity>
           ))}
         </View>
+        ) : (
+           <View style={styles.syllabusSection}>
+              {videoNotes.length > 0 ? (
+                 videoNotes.map(n => (
+                   <View key={n.id} style={styles.noteItem}>
+                      <Text style={styles.noteTimestamp}>
+                         {Math.floor(n.video_timestamp / 60)}:{String(n.video_timestamp % 60).padStart(2, '0')}
+                      </Text>
+                      <Text style={styles.noteContent}>{n.content}</Text>
+                   </View>
+                 ))
+              ) : (
+                 <Text style={styles.progressLabel}>No notes for this lesson yet.</Text>
+              )}
+           </View>
+        )}
       </ScrollView>
 
       {/* Bottom Button */}
       <View style={styles.footer}>
         {(() => {
           const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
-          const isLast = currentIndex === syllabus.length - 1;
           const currentItem = syllabus[currentIndex];
+          
+          const uncompletedCount = syllabus.filter(s => !s.completed).length;
+          const isReadyForAssessment = uncompletedCount === 0 || (uncompletedCount === 1 && currentItem && !currentItem.completed);
+          
+          const isLastIndex = currentIndex === syllabus.length - 1;
+          const needsToLoopBack = isLastIndex && !isReadyForAssessment;
+          
+          let btnText = "Next Lesson";
+          if (isReadyForAssessment) {
+             btnText = "Take Assessment";
+          } else if (needsToLoopBack) {
+             btnText = "Complete Missed Lessons";
+          }
+
           const canProceed = Platform.OS === 'web' || lessonUnlocked || (currentItem && currentItem.completed); 
 
           return (
-            <TouchableOpacity 
-              disabled={!canProceed}
-              style={[styles.nextBtn, !canProceed && styles.disabledBtn]}
-              onPress={() => {
-                if (isLast) {
-                  Alert.alert('Coming Soon', 'Take Assessment module coming soon!');
-                } else {
-                  const nextLesson = syllabus[currentIndex + 1];
-                  setCurrentVideoId(nextLesson.id);
-                  setCurrentLesson(nextLesson.title);
-                }
-              }}
-            >
-              <Text style={styles.nextBtnText}>
-                {isLast ? 'Take Assessment' : 'Next Lesson'}
-              </Text>
-              {!canProceed && <Text style={styles.lockInfo}>Watch 40% to unlock</Text>}
-            </TouchableOpacity>
+            <View style={styles.dualFooterRow}>
+              <TouchableOpacity 
+                disabled={!canProceed}
+                style={[styles.footerBtnPrimary, !canProceed && styles.disabledBtn]}
+                onPress={async () => {
+                  if (currentItem && !currentItem.completed) {
+                     await sendProgressAnalytics('complete', videoStats.current || 0, true);
+                     setSyllabus(prev => prev.map((s, idx) => ({
+                        ...s,
+                        status: idx === currentIndex ? 'complete' : s.status,
+                        completed: idx === currentIndex ? true : s.completed
+                     })));
+                  }
+
+                  if (isReadyForAssessment) {
+                    Alert.alert('Coming Soon', 'Take Assessment module coming soon!');
+                  } else if (needsToLoopBack) {
+                    const nextTarget = syllabus.find(s => !s.completed && s.id !== currentVideoId) || syllabus[0];
+                    setCurrentVideoId(nextTarget.id);
+                    setCurrentLesson(nextTarget.title);
+                    setLessonUnlocked(false);
+                  } else {
+                    const nextLesson = syllabus[currentIndex + 1];
+                    setCurrentVideoId(nextLesson.id);
+                    setCurrentLesson(nextLesson.title);
+                    setLessonUnlocked(false);
+                  }
+                }}
+              >
+                <Play size={20} color={Colors.white} />
+                <Text style={styles.footerBtnPrimaryText}>{btnText}</Text>
+                {!canProceed && <Text style={styles.lockInfo}>Watch 40%</Text>}
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.footerBtnSecondary} onPress={() => setShowNotesModal(true)}>
+                 <FileText size={20} color={Colors.navy} />
+                 <Text style={styles.footerBtnSecondaryText}>Add Note</Text>
+              </TouchableOpacity>
+            </View>
           );
         })()}
       </View>
@@ -403,21 +491,29 @@ export default function VideoPlayerScreen() {
   );
 }
 
+const luminoShadow = {
+  shadowColor: Colors.navy,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
   },
   webContainer: {
-    backgroundColor: '#f0f2f5',
+    backgroundColor: Colors.offWhite,
   },
   webContentWrapper: {
     width: '100%',
     maxWidth: 800,
-    backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
-    boxShadow: '0 0 20px rgba(0,0,0,0.1)',
+    backgroundColor: Colors.offWhite,
+    flex: 1,
+    boxShadow: '0 0 20px rgba(4,13,67,0.05)',
   },
   playerWrapper: {
     backgroundColor: 'black',
@@ -438,52 +534,150 @@ const styles = StyleSheet.create({
   lessonHeader: {
     padding: 20,
   },
+  lessonSubtitle: {
+    fontSize: 14,
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 4,
+  },
   lessonTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 4,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  statusTag: {
+    backgroundColor: Colors.offWhite,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  statusTagText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.navy,
   },
   lessonMeta: {
     fontSize: 14,
-    color: Colors.textSilver,
-    marginBottom: 20,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
   courseProgress: {
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     padding: 16,
     borderRadius: 12,
-  },
-  progressHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    ...luminoShadow,
+  },
+  progressCircleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 4,
+    borderColor: Colors.brandBlue,
+    borderLeftColor: Colors.borderLight, // Simulating 75% progress
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressInnerRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressPercentage: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
+  },
+  progressTextContainer: {
+    justifyContent: 'center',
   },
   progressLabel: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.navy,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 2,
   },
   progressValue: {
+    fontSize: 12,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
+  },
+  viewCourseChip: {
+    backgroundColor: Colors.offWhite,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  viewCourseText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.brandBlue,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginTop: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  tabItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginRight: 24,
+    gap: 6,
+  },
+  activeTabItem: {
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.brandBlue,
+  },
+  tabText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    color: Colors.silver,
+    fontFamily: 'Inter_600SemiBold',
   },
-  progressBarLarge: {
-    height: 8,
-    backgroundColor: Colors.borderLight,
-    borderRadius: 4,
+  activeTabText: {
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
   },
-  progressFillLarge: {
-    height: '100%',
-    backgroundColor: Colors.primaryDark,
-    borderRadius: 4,
+  badge: {
+    backgroundColor: Colors.offWhite,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.brandBlue,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
   },
   actionBtn: {
     alignItems: 'center',
@@ -491,7 +685,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 12,
-    color: Colors.primaryDark,
+    color: Colors.navy,
     fontWeight: '600',
   },
   syllabusSection: {
@@ -499,75 +693,139 @@ const styles = StyleSheet.create({
   },
   subTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontWeight: '700',
+    color: Colors.navy,
     marginBottom: 16,
   },
   syllabusItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
   },
   activeSyllabusItem: {
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     borderRadius: 8,
-    paddingHorizontal: 8,
+    ...luminoShadow,
+    borderBottomWidth: 0,
+    marginVertical: 4,
+  },
+  activeIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: Colors.brandBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completedIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inactiveIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleNumber: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.silver,
   },
   statusIconWrapper: {
     marginRight: 16,
+    width: 32,
+    alignItems: 'center',
   },
   syllabusInfo: {
     flex: 1,
   },
   syllabusTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.navy,
     marginBottom: 2,
   },
   syllabusMetaText: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
   },
-  percentageText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.accentElectric,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.borderLight,
+  syllabusRightAction: {
+    marginLeft: 12,
   },
   footer: {
     padding: 20,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight2,
+    borderTopColor: Colors.borderLight,
     zIndex: 1000,
   },
-  nextBtn: {
-    backgroundColor: Colors.primaryDark,
+  dualFooterRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  footerBtnPrimary: {
+    flex: 1,
+    backgroundColor: Colors.brandBlue,
     padding: 16,
     borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  footerBtnPrimaryText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+  },
+  footerBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.white,
+    gap: 8,
+  },
+  footerBtnSecondaryText: {
+    color: Colors.navy,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
   },
   disabledBtn: {
     opacity: 0.6,
   },
-  nextBtnText: {
-    color: Colors.bgWhite,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   lockInfo: {
     fontSize: 11,
-    color: Colors.bgWhite,
+    color: Colors.white,
     opacity: 0.8,
-    marginTop: 2,
+    marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -575,7 +833,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -588,18 +846,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
   },
   noteInput: {
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.offWhite,
     borderRadius: 12,
     padding: 16,
     height: 120,
     textAlignVertical: 'top',
     fontSize: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   modalActions: {
     flexDirection: 'row',
@@ -610,47 +870,47 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.offWhite,
   },
   cancelBtnText: {
     fontWeight: '600',
-    color: Colors.textDark,
+    color: Colors.navy,
   },
   saveBtn: {
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
   },
   saveBtnText: {
-    fontWeight: 'bold',
-    color: Colors.bgWhite,
+    fontWeight: '700',
+    color: Colors.white,
   },
   previousNotes: {
     marginTop: 24,
   },
   prevNotesTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontWeight: '700',
+    color: Colors.navy,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
     paddingBottom: 8,
     marginBottom: 12,
   },
   noteItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.bgLight,
+    borderBottomColor: Colors.offWhite,
   },
   noteTimestamp: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontWeight: '700',
+    color: Colors.brandBlue,
     marginBottom: 2,
   },
   noteContent: {
     fontSize: 14,
-    color: Colors.textDark,
+    color: Colors.navy,
   },
 });

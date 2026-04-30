@@ -15,6 +15,8 @@ class Playlist(Base):
     youtube_playlist_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
+    thumbnail: Mapped[str] = mapped_column(String(500), nullable=True)
+    author_name: Mapped[str] = mapped_column(String(255), nullable=True)
     last_synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

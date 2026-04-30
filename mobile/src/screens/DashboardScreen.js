@@ -8,13 +8,22 @@ import {
   TextInput, 
   Image, 
   ActivityIndicator,
-  SafeAreaView,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
 import { API_URLS, USER_ID } from '../constants/Config';
+
+const luminoShadow = {
+  shadowColor: Colors.navy,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
@@ -69,8 +78,8 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
-      <ScrollView stickyHeaderIndices={[0]} showsVerticalScrollIndicator={false}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
+      <ScrollView style={{ flex: 1, width: '100%' }} stickyHeaderIndices={[0]} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.welcomeText}>Welcome Back</Text>
@@ -165,7 +174,7 @@ export default function DashboardScreen() {
                       <Text style={styles.courseTitle} numberOfLines={2}>{course.title}</Text>
                       <View style={styles.courseMeta}>
                         <View style={styles.ratingRow}>
-                          <Star size={14} fill={Colors.accentHoney} color={Colors.accentHoney} />
+                          <Star size={14} fill={Colors.canary} color={Colors.canary} />
                           <Text style={styles.ratingText}> {course.rating}</Text>
                         </View>
                         <Text style={styles.studentsText}>{course.students} students</Text>
@@ -186,50 +195,49 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
   },
   webContainer: {
-    backgroundColor: '#f0f2f5',
+    backgroundColor: Colors.offWhite,
   },
   webContentWrapper: {
     width: '100%',
     maxWidth: 800,
-    backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
-    boxShadow: '0 0 20px rgba(0,0,0,0.1)',
+    backgroundColor: Colors.offWhite,
+    flex: 1,
+    boxShadow: '0 0 20px rgba(4,13,67,0.05)',
   },
   header: {
     padding: 20,
-    backgroundColor: Colors.bgWhite,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    backgroundColor: Colors.offWhite,
   },
   welcomeText: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 16,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bgLight,
-    padding: 12,
+    backgroundColor: Colors.white,
+    padding: 14,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    ...luminoShadow,
   },
   searchPlaceholder: {
     marginLeft: 10,
-    color: Colors.textSilver,
+    color: Colors.silver,
     fontSize: 14,
+    fontFamily: 'Inter_400Regular',
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
     fontSize: 14,
-    color: Colors.primaryDark,
+    color: Colors.navy,
+    fontFamily: 'Inter_400Regular',
   },
   content: {
     padding: 20,
@@ -239,31 +247,26 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 16,
   },
   continueCards: {
     paddingRight: 20,
+    paddingVertical: 10,
   },
   continueCard: {
-    width: 200,
-    backgroundColor: Colors.bgWhite,
-    borderRadius: 12,
+    width: 220,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
     padding: 16,
     marginRight: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderLight2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...luminoShadow,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primaryDark,
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 12,
   },
   progressContainer: {
@@ -271,29 +274,32 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: Colors.borderLight2,
+    backgroundColor: Colors.borderLight,
     borderRadius: 3,
     marginBottom: 6,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.accentElectric,
+    backgroundColor: Colors.brandBlue,
     borderRadius: 3,
   },
   progressText: {
     fontSize: 11,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_600SemiBold',
   },
   resumeBtn: {
-    backgroundColor: Colors.primaryDark,
-    padding: 8,
+    backgroundColor: Colors.brandBlue,
     borderRadius: 8,
+    padding: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
   },
   resumeBtnText: {
-    color: Colors.bgWhite,
-    fontSize: 12,
-    fontWeight: '600',
+    color: Colors.white,
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
   },
   emptyState: {
     padding: 24,
@@ -304,21 +310,22 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight2,
   },
   emptyText: {
-    color: Colors.textSilver,
+    color: Colors.silver,
     fontSize: 13,
+    fontFamily: 'Inter_400Regular',
     textAlign: 'center',
     marginBottom: 16,
   },
   exploreBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.navy,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   exploreBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   tagsContainer: {
     marginBottom: 20,
@@ -327,20 +334,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     marginRight: 10,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   activeTag: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.navy,
+    borderWidth: 0,
   },
   tagText: {
     fontSize: 13,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_600SemiBold',
   },
   activeTagText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
   },
   sectionHead: {
     flexDirection: 'row',
@@ -349,20 +359,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   seeAll: {
-    color: Colors.primaryDark,
+    color: Colors.brandBlue,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter_700Bold',
   },
   courseList: {
     gap: 16,
   },
   courseCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.bgWhite,
-    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    ...luminoShadow,
+    marginBottom: 4,
   },
   courseImage: {
     width: 100,
@@ -375,14 +385,14 @@ const styles = StyleSheet.create({
   },
   courseCat: {
     fontSize: 11,
-    color: Colors.accentElectric,
-    fontWeight: 'bold',
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
     marginBottom: 4,
   },
   courseTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 8,
   },
   courseMeta: {
@@ -396,11 +406,12 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 12,
-    color: Colors.textDark,
-    fontWeight: '600',
+    color: Colors.navy,
+    fontFamily: 'Inter_700Bold',
   },
   studentsText: {
     fontSize: 11,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
 });

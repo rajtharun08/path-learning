@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.playlist import Playlist
 from app.repositories.content_repository import ContentRepository
 from app.services.youtube_client import fetch_playlist_from_youtube
+from app.schemas.content import PlaylistCreate, PlaylistUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,49 @@ class ContentService:
             title=data["title"],
             description=data["description"],
             videos_data=data["videos"],
+        )
+
+    def create_custom_playlist(self, payload: PlaylistCreate) -> Optional[Playlist]:
+        data = fetch_playlist_from_youtube(payload.youtube_playlist_id)
+        if not data:
+            return None
+
+        # Fallback logic
+        title = payload.title if payload.title is not None else data["title"]
+        description = payload.description if payload.description is not None else data["description"]
+        thumbnail = payload.thumbnail
+        author_name = payload.author_name
+
+        return self.repo.create_or_update_playlist(
+            youtube_playlist_id=payload.youtube_playlist_id,
+            title=title,
+            description=description,
+            videos_data=data["videos"],
+            thumbnail=thumbnail,
+            author_name=author_name,
+        )
+
+    def update_custom_playlist(self, playlist_id: str, payload: PlaylistUpdate) -> Optional[Playlist]:
+        playlist = self.repo.get_playlist_by_youtube_id(playlist_id)
+        if not playlist:
+            return None
+
+        title = payload.title if payload.title is not None else playlist.title
+        description = payload.description if payload.description is not None else playlist.description
+        thumbnail = payload.thumbnail if payload.thumbnail is not None else playlist.thumbnail
+        author_name = payload.author_name if payload.author_name is not None else playlist.author_name
+
+        # Re-sync videos just to keep data fresh
+        data = fetch_playlist_from_youtube(playlist_id)
+        videos_data = data["videos"] if data else []
+
+        return self.repo.create_or_update_playlist(
+            youtube_playlist_id=playlist_id,
+            title=title,
+            description=description,
+            videos_data=videos_data,
+            thumbnail=thumbnail,
+            author_name=author_name,
         )
 
     def get_full_playlist(self, youtube_playlist_id: str) -> Optional[Playlist]:

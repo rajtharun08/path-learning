@@ -6,9 +6,9 @@ import {
   TouchableOpacity, 
   ScrollView, 
   Image, 
-  ActivityIndicator,
-  SafeAreaView
+  ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CheckCircle2, PlayCircle } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -107,14 +107,14 @@ export default function LearningPathScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={24} color={Colors.primaryDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{pathName}</Text>
-      </View>
+      <ScrollView style={{ flex: 1, width: '100%' }} stickyHeaderIndices={[0]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ArrowLeft size={24} color={Colors.navy} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>{pathName}</Text>
+        </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.pathHeaderMeta}>
           <Text style={styles.mainTitle}>{pathName}</Text>
           <Text style={styles.totalDuration}>Total Duration: 45h 30m</Text>
@@ -193,10 +193,18 @@ export default function LearningPathScreen() {
   );
 }
 
+const luminoShadow = {
+  shadowColor: '#040D43',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
   },
   center: {
     flex: 1,
@@ -213,8 +221,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     flex: 1,
   },
   scrollContent: {
@@ -225,32 +233,29 @@ const styles = StyleSheet.create({
   },
   mainTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 8,
   },
   totalDuration: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
   },
   progressCard: {
     margin: 20,
     marginTop: 0,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
-    shadowColor: Colors.primaryDark,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 5,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   progressTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 16,
   },
   progressHeader: {
@@ -260,86 +265,93 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
   progressPercent: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.accentElectric,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.brandBlue,
   },
   progressBarLarge: {
     height: 10,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.borderLight,
     borderRadius: 5,
     marginBottom: 12,
   },
   progressFillLarge: {
     height: '100%',
-    backgroundColor: Colors.accentElectric,
+    backgroundColor: Colors.brandBlue,
     borderRadius: 5,
   },
   encouragementText: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
     fontStyle: 'italic',
+    fontFamily: 'Inter_400Regular',
   },
   enrollCard: {
     margin: 20,
     marginTop: 0,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   enrollTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 8,
   },
   enrollDesc: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
+    fontFamily: 'Inter_400Regular',
   },
   enrollBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     width: '100%',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   enrollBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
   },
   curriculum: {
     padding: 20,
   },
   curriculumTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 20,
   },
   moduleCount: {
     fontSize: 14,
-    fontWeight: 'normal',
-    color: Colors.textSilver,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.silver,
   },
   moduleList: {
     gap: 16,
   },
   moduleCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   moduleImgWrapper: {
     position: 'relative',
@@ -363,7 +375,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   activeIcon: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
   },
   moduleInfo: {
     flex: 1,
@@ -372,14 +384,14 @@ const styles = StyleSheet.create({
   },
   moduleTitle: {
     fontSize: 15,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 4,
   },
   playingBadge: {
     fontSize: 10,
-    color: Colors.accentElectric,
-    fontWeight: 'bold',
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
     marginBottom: 4,
   },
   moduleMeta: {
@@ -389,17 +401,18 @@ const styles = StyleSheet.create({
   },
   moduleDuration: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
   },
   completeText: {
     fontSize: 11,
     color: '#10B981',
-    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
   },
   activeText: {
     fontSize: 11,
-    color: Colors.accentElectric,
-    fontWeight: 'bold',
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
   },
   locked: {
     opacity: 0.7,
@@ -413,7 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
   resumeBtnLarge: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     flexDirection: 'row',
     padding: 16,
     borderRadius: 12,
@@ -421,8 +434,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resumeBtnTextLarge: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
   },
 });

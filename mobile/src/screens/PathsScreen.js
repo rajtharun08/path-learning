@@ -5,11 +5,11 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   TextInput, 
-  ScrollView, 
-  SafeAreaView,
+  ScrollView,
   ActivityIndicator,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
@@ -74,12 +74,12 @@ export default function PathsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
-      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Paths Directory</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.topSection}>
           <Text style={styles.subtitle}>Track your learning progress and continue where you left off. Stay on track with your learning goals.</Text>
           
@@ -149,7 +149,7 @@ export default function PathsScreen() {
                 <View style={styles.pathHeader}>
                   <Text style={styles.pathTitle}>{path.title}</Text>
                   <View style={styles.ratingRow}>
-                    <Star size={14} fill={Colors.accentHoney} color={Colors.accentHoney} />
+                    <Star size={14} fill={Colors.canary} color={Colors.canary} />
                     <Text style={styles.ratingText}> {path.rating}</Text>
                   </View>
                 </View>
@@ -174,20 +174,32 @@ export default function PathsScreen() {
   );
 }
 
+const luminoShadow = {
+  shadowColor: '#040D43',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
   },
   webContainer: {
-    backgroundColor: '#f0f2f5',
+    backgroundColor: Colors.offWhite,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   webContentWrapper: {
     width: '100%',
     maxWidth: 800,
     backgroundColor: Colors.bgWhite,
-    minHeight: '100vh',
+    flex: 1,
     boxShadow: '0 0 20px rgba(0,0,0,0.1)',
   },
   header: {
@@ -200,17 +212,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
   },
   topSection: {
     padding: 20,
   },
   subtitle: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
     lineHeight: 20,
     marginBottom: 24,
+    fontFamily: 'Inter_400Regular',
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -221,38 +234,41 @@ const styles = StyleSheet.create({
   blueBar: {
     width: 4,
     height: 20,
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.navy,
     borderRadius: 2,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
   },
   sectionDesc: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
     marginBottom: 16,
+    fontFamily: 'Inter_400Regular',
   },
   searchContainer: {
     marginBottom: 24,
   },
   searchBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
     overflow: 'hidden',
+    ...luminoShadow,
   },
   searchInput: {
     flex: 1,
     padding: 12,
     fontSize: 14,
-    color: Colors.textDark,
+    color: Colors.navy,
+    fontFamily: 'Inter_400Regular',
   },
   searchSubmit: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     width: 48,
     height: 48,
     alignItems: 'center',
@@ -264,8 +280,8 @@ const styles = StyleSheet.create({
   },
   sectionTitleMain: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 16,
   },
   continueCards: {
@@ -273,22 +289,18 @@ const styles = StyleSheet.create({
   },
   continueCard: {
     width: 200,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 16,
     marginRight: 16,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   cardTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.navy,
     marginBottom: 12,
   },
   progressContainer: {
@@ -296,58 +308,56 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: Colors.borderLight2,
+    backgroundColor: Colors.borderLight,
     borderRadius: 3,
     marginBottom: 6,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.accentElectric,
+    backgroundColor: Colors.brandBlue,
     borderRadius: 3,
   },
   progressText: {
     fontSize: 11,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
   resumeBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     padding: 8,
     borderRadius: 8,
     alignItems: 'center',
   },
   resumeBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   emptyState: {
     padding: 24,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
     alignItems: 'center',
   },
   emptyText: {
-    color: Colors.textSilver,
+    color: Colors.silver,
     fontSize: 13,
     textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
   },
   pathsList: {
     padding: 20,
     gap: 16,
   },
   pathCard: {
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   pathHeader: {
     flexDirection: 'row',
@@ -357,8 +367,8 @@ const styles = StyleSheet.create({
   },
   pathTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     flex: 1,
   },
   ratingRow: {
@@ -367,14 +377,15 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 12,
-    color: Colors.textDark,
-    fontWeight: '600',
+    color: Colors.navy,
+    fontFamily: 'Inter_600SemiBold',
   },
   pathDesc: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
     lineHeight: 20,
     marginBottom: 16,
+    fontFamily: 'Inter_400Regular',
   },
   pathMeta: {
     flexDirection: 'row',
@@ -383,17 +394,18 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
   viewBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   viewBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
   },
 });

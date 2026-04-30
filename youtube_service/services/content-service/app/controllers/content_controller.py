@@ -6,6 +6,8 @@ from app.schemas.content import (
     PlaylistResponse,
     PlaylistSearchResultResponse,
     VideoMetadataResponse,
+    PlaylistCreate,
+    PlaylistUpdate
 )
 from app.services.content_service import ContentService
 
@@ -17,6 +19,24 @@ class ContentController:
 
     def get_playlist(self, playlist_id: str):
         playlist = self.service.get_full_playlist(playlist_id)
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Playlist '{playlist_id}' not found.",
+            )
+        return playlist
+
+    def create_playlist(self, payload: PlaylistCreate):
+        playlist = self.service.create_custom_playlist(payload)
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"YouTube playlist '{payload.youtube_playlist_id}' not found or could not be synced.",
+            )
+        return playlist
+
+    def update_playlist(self, playlist_id: str, payload: PlaylistUpdate):
+        playlist = self.service.update_custom_playlist(playlist_id, payload)
         if not playlist:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

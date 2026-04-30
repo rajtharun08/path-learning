@@ -3,21 +3,25 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+  TouchableOpacity,
   Image, 
   ActivityIndicator,
-  SafeAreaView
+  Platform,
+  ScrollView
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // ✅ added
 import { ArrowLeft, Star, Clock } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
 import { API_URLS, USER_ID } from '../constants/Config';
 
 export default function CourseDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets(); // ✅ added
+
   const { courseId } = route.params || { courseId: 'playlist-fastapi-basics' };
   
   const [activeTab, setActiveTab] = useState('Overview');
@@ -30,8 +34,17 @@ export default function CourseDetailsScreen() {
      students: "0",
      duration: "-",
      desc: "",
+     instructor: "Loading...",
      img: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
   });
+
+  const generateConsistentHash = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+  };
 
   useEffect(() => {
     fetchCourseDetails();
@@ -43,12 +56,18 @@ export default function CourseDetailsScreen() {
       const res = await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}?user_id=${USER_ID}`);
       const data = await res.json();
       if(data && data.title) {
+         const hash = generateConsistentHash(courseId);
+         const dynamicRating = (4.0 + (hash % 10) / 10).toFixed(1);
+         const dynamicStudents = `${(hash % 9) + 1}.${hash % 10}k`;
+         const instructorName = data.author_name || `${data.title.split(' ')[0]} Expert`;
+
          setCourse({
            title: data.title,
-           rating: data.rating || 4.8, 
-           students: "1.2k",
+           rating: data.rating || dynamicRating, 
+           students: dynamicStudents,
            duration: data.duration || (data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours"),
            desc: data.description || "",
+           instructor: instructorName,
            img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
          });
          if (data.lessons) {
@@ -102,93 +121,97 @@ export default function CourseDetailsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={24} color={Colors.primaryDark} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Course Details</Text>
-      </View>
+    <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1 }}>
+        
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: insets.bottom + 20 } // ✅ FIX
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Image source={{ uri: course.img }} style={styles.heroImage} />
-
-        <View style={styles.courseHeader}>
-          <View style={styles.tagWrapper}>
-            <Text style={styles.tag}>Development</Text>
-          </View>
-          <Text style={styles.title}>{course.title}</Text>
-          
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Star size={16} fill={Colors.accentHoney} color={Colors.accentHoney} />
-              <Text style={styles.metaText}> {course.rating}</Text>
-            </View>
-            <Text style={styles.metaText}>{course.students} students</Text>
-            <View style={styles.metaItem}>
-              <Clock size={16} color={Colors.textSilver} />
-              <Text style={styles.metaText}> {course.duration}</Text>
-            </View>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <ArrowLeft size={24} color={Colors.primaryDark} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Course Details</Text>
           </View>
 
-          {isEnrolled ? (
-            <TouchableOpacity 
-              style={[styles.enrollBtn, {backgroundColor: Colors.accentHoney}]}
-              onPress={() => navigation.navigate('VideoPlayer', { courseId })}
-            >
-              <Text style={[styles.enrollBtnText, {color: Colors.textDark}]}>Resume Course</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={styles.enrollBtn}
-              onPress={handleCourseEnroll}
-            >
-              <Text style={styles.enrollBtnText}>Enroll in Course</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          <Image source={{ uri: course.img }} style={styles.heroImage} />
 
-        <View style={styles.tabs}>
-          {['Overview', 'Lessons', 'Reviews'].map(tab => (
-            <TouchableOpacity 
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.activeTab]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.tabContent}>
-          {activeTab === 'Overview' && (
-            <View style={styles.overview}>
-              <Text style={styles.subTitle}>About this course</Text>
-              <Text style={styles.desc}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</Text>
-              
-              <Text style={styles.subTitle}>Instructor</Text>
-              <View style={styles.instructor}>
-                <Image source={{ uri: "https://ui-avatars.com/api/?name=Mike+Chen&background=07125E&color=fff" }} style={styles.instructorImg} />
-                <View style={styles.instructorInfo}>
-                  <Text style={styles.instructorName}>Mike Chen</Text>
-                  <Text style={styles.instructorRole}>React Developer</Text>
-                </View>
+          <View style={styles.courseHeader}>
+            <View style={styles.tagWrapper}>
+              <Text style={styles.tag}>Development</Text>
+            </View>
+            <Text style={styles.title}>{course.title}</Text>
+            
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Star size={16} fill={Colors.canary} color={Colors.canary} />
+                <Text style={styles.metaText}> {course.rating}</Text>
+              </View>
+              <Text style={styles.metaText}>{course.students} students</Text>
+              <View style={styles.metaItem}>
+                <Clock size={16} color={Colors.textSilver} />
+                <Text style={styles.metaText}> {course.duration}</Text>
               </View>
             </View>
-          )}
-          
-          {activeTab === 'Lessons' && (
-             <View style={styles.overview}>
-               {!isEnrolled ? (
-                 <View style={styles.lockedState}>
-                   <Text style={styles.lockedTitle}>Content Locked</Text>
-                   <Text style={styles.lockedText}>Please enroll in the course to view the full curriculum map.</Text>
-                   <TouchableOpacity style={styles.smallEnrollBtn} onPress={handleCourseEnroll}>
-                     <Text style={styles.smallEnrollBtnText}>Enroll</Text>
-                   </TouchableOpacity>
-                 </View>
-               ) : (
-                 <View style={styles.lessonsList}>
+
+            {isEnrolled ? (
+              <TouchableOpacity style={styles.enrollBtn} onPress={() => navigation.navigate('VideoPlayer', { courseId })}>
+                <Text style={styles.enrollBtnText}>Resume Course</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.enrollBtn} onPress={handleCourseEnroll}>
+                <Text style={styles.enrollBtnText}>Enroll in Course</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.tabs}>
+            {['Overview', 'Lessons', 'Reviews'].map(tab => (
+              <TouchableOpacity 
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.activeTab]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.tabContent}>
+            {activeTab === 'Overview' && (
+              <View style={styles.overview}>
+                <Text style={styles.subTitle}>About this course</Text>
+                <Text style={styles.desc}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</Text>
+                
+                <Text style={styles.subTitle}>Instructor</Text>
+                <View style={styles.instructor}>
+                  <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(course.instructor)}&background=07125E&color=fff` }} style={styles.instructorImg} />
+                  <View style={styles.instructorInfo}>
+                    <Text style={styles.instructorName}>{course.instructor}</Text>
+                    <Text style={styles.instructorRole}>Course Author</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {activeTab === 'Lessons' && (
+              <View style={styles.overview}>
+                {!isEnrolled ? (
+                  <View style={styles.lockedState}>
+                    <Text style={styles.lockedTitle}>Content Locked</Text>
+                    <Text style={styles.lockedText}>Please enroll in the course to view the full curriculum map.</Text>
+                    <TouchableOpacity style={styles.smallEnrollBtn} onPress={handleCourseEnroll}>
+                      <Text style={styles.smallEnrollBtnText}>Enroll</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.lessonsList}>
                     {lessons.map((lesson, idx) => (
                       <TouchableOpacity 
                         key={lesson.id} 
@@ -204,44 +227,72 @@ export default function CourseDetailsScreen() {
                         </View>
                       </TouchableOpacity>
                     ))}
-                 </View>
-               )}
-             </View>
-          )}
+                  </View>
+                )}
+              </View>
+            )}
 
-          {activeTab === 'Reviews' && (
-             <View style={styles.overview}>
-               <Text style={styles.desc}>4.8 out of 5 stars based on 1,200 reviews</Text>
-             </View>
-          )}
-        </View>
-      </ScrollView>
+            {activeTab === 'Reviews' && (
+              <View style={styles.overview}>
+                <Text style={styles.desc}>4.8 out of 5 stars based on 1,200 reviews</Text>
+              </View>
+            )}
+          </View>
+
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
+
+const luminoShadow = {
+  shadowColor: Colors.navy,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
-  container: {
+ container: {
     flex: 1,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.offWhite,
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+  },
+  webContainer: {
+    backgroundColor: Colors.offWhite,
+  },
+  webContentWrapper: {
+    width: '100%',
+    maxWidth: 800,
+    backgroundColor: Colors.offWhite,
+    flex: 1,
+    boxShadow: '0 0 20px rgba(4,13,67,0.05)',
+  },
+  scrollContent: {
+    flexGrow: 1, // ✅ updated
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.offWhite,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
     gap: 12,
+    backgroundColor: Colors.white,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
   },
   heroImage: {
     width: '100%',
@@ -249,24 +300,27 @@ const styles = StyleSheet.create({
   },
   courseHeader: {
     padding: 20,
+    backgroundColor: Colors.white,
+    ...luminoShadow,
+    zIndex: 2,
   },
   tagWrapper: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.bgLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    backgroundColor: Colors.navy,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
     marginBottom: 12,
   },
   tag: {
     fontSize: 12,
-    color: Colors.primaryDark,
-    fontWeight: 'bold',
+    color: Colors.white,
+    fontFamily: 'Inter_600SemiBold',
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 16,
   },
   metaRow: {
@@ -281,106 +335,115 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
   enrollBtn: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.brandBlue,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   enrollBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
   },
   tabs: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.borderLight,
   },
   tab: {
-    paddingVertical: 12,
+    paddingVertical: 16,
     marginRight: 24,
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primaryDark,
+    borderBottomColor: Colors.brandBlue,
   },
   tabText: {
     fontSize: 15,
-    color: Colors.textSilver,
-    fontWeight: '600',
+    color: Colors.silver,
+    fontFamily: 'Inter_600SemiBold',
   },
   activeTabText: {
-    color: Colors.primaryDark,
+    color: Colors.brandBlue,
+    fontFamily: 'Inter_700Bold',
   },
   tabContent: {
     padding: 20,
   },
   subTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
     marginBottom: 12,
     marginTop: 8,
   },
   desc: {
     fontSize: 15,
-    color: Colors.textSilver,
-    lineHeight: 22,
+    color: Colors.silver,
+    lineHeight: 24,
     marginBottom: 24,
+    fontFamily: 'Inter_400Regular',
   },
   instructor: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     padding: 16,
     borderRadius: 12,
+    ...luminoShadow,
   },
   instructorImg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     marginRight: 16,
   },
   instructorName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
   },
   instructorRole: {
     fontSize: 13,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+    marginTop: 2,
   },
   lockedState: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.white,
     borderRadius: 12,
+    ...luminoShadow,
   },
   lockedTitle: {
-    fontWeight: 'bold',
-    color: Colors.textSilver,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.silver,
     marginBottom: 8,
   },
   lockedText: {
     fontSize: 13,
-    color: Colors.textSilver,
+    color: Colors.silver,
     textAlign: 'center',
     marginBottom: 16,
+    fontFamily: 'Inter_400Regular',
   },
   smallEnrollBtn: {
-    backgroundColor: Colors.primaryDark,
-    paddingVertical: 8,
+    backgroundColor: Colors.brandBlue,
+    paddingVertical: 10,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   smallEnrollBtnText: {
-    color: Colors.bgWhite,
+    color: Colors.white,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
   lessonsList: {
     gap: 12,
@@ -388,37 +451,39 @@ const styles = StyleSheet.create({
   lessonItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.borderLight2,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
   },
   lessonIndex: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.offWhite,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   lessonIndexText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.primaryDark,
+    color: Colors.silver,
+    fontFamily: 'Inter_600SemiBold',
   },
   lessonInfo: {
     flex: 1,
   },
   lessonTitle: {
     fontSize: 15,
-    fontWeight: '600',
-    color: Colors.primaryDark,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.navy,
     marginBottom: 4,
   },
   lessonDuration: {
     fontSize: 12,
-    color: Colors.textSilver,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
   },
 });
