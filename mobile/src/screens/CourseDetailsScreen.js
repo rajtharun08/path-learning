@@ -9,8 +9,8 @@ import {
   Platform,
   ScrollView
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // ✅ added
-import { ArrowLeft, Star, Clock } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowLeft, Star, Clock, Check, Lock, PlayCircle } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +20,7 @@ import { API_URLS, USER_ID } from '../constants/Config';
 export default function CourseDetailsScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const insets = useSafeAreaInsets(); // ✅ added
+  const insets = useSafeAreaInsets();
 
   const { courseId } = route.params || { courseId: 'playlist-fastapi-basics' };
   
@@ -46,6 +46,13 @@ export default function CourseDetailsScreen() {
     return Math.abs(hash);
   };
 
+  const [outcomes, setOutcomes] = useState([
+    "Build scalable REST APIs",
+    "Master JSON serialization",
+    "Understand data types",
+    "Implement best practices"
+  ]);
+
   useEffect(() => {
     fetchCourseDetails();
     checkEnrollment();
@@ -70,14 +77,21 @@ export default function CourseDetailsScreen() {
            instructor: instructorName,
            img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
          });
-         if (data.lessons) {
-           setLessons(data.lessons.map((l, i) => ({
-              id: l.youtube_video_id || i,
-              title: l.title || `Lesson ${i+1}`,
-              duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
-              status: l.completed ? 'complete' : 'playing'
-           })));
-         }
+          if (data.lessons) {
+            setLessons(data.lessons.map((l, i) => ({
+               id: l.youtube_video_id || i,
+               title: l.title || `Lesson ${i+1}`,
+               duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
+               status: l.completed ? 'complete' : 'playing'
+            })));
+
+            if (data.outcomes && data.outcomes.length > 0) {
+              setOutcomes(data.outcomes);
+            } else if (data.lessons.length >= 2) {
+              // Dynamic fallback: use titles of the first 4 lessons
+              setOutcomes(data.lessons.slice(0, 4).map(l => l.title));
+            }
+          }
       }
     } catch (err) {
       console.log('Backend not available', err);
@@ -128,7 +142,7 @@ export default function CourseDetailsScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: insets.bottom + 20 } // ✅ FIX
+            { paddingBottom: insets.bottom + 100 }
           ]}
           showsVerticalScrollIndicator={false}
         >
@@ -159,16 +173,6 @@ export default function CourseDetailsScreen() {
                 <Text style={styles.metaText}> {course.duration}</Text>
               </View>
             </View>
-
-            {isEnrolled ? (
-              <TouchableOpacity style={styles.enrollBtn} onPress={() => navigation.navigate('VideoPlayer', { courseId })}>
-                <Text style={styles.enrollBtnText}>Resume Course</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.enrollBtn} onPress={handleCourseEnroll}>
-                <Text style={styles.enrollBtnText}>Enroll in Course</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           <View style={styles.tabs}>
@@ -186,6 +190,16 @@ export default function CourseDetailsScreen() {
           <View style={styles.tabContent}>
             {activeTab === 'Overview' && (
               <View style={styles.overview}>
+                <Text style={styles.subTitle}>What you'll learn</Text>
+                <View style={styles.learnGrid}>
+                  {outcomes.map((item, idx) => (
+                    <View key={idx} style={styles.learnItem}>
+                      <Check size={16} color={Colors.brandBlue} style={styles.checkIcon} />
+                      <Text style={styles.learnText}>{item}</Text>
+                    </View>
+                  ))}
+                </View>
+
                 <Text style={styles.subTitle}>About this course</Text>
                 <Text style={styles.desc}>{course.desc || "Learn everything you need to know in this comprehensive and straightforward video course."}</Text>
                 
@@ -210,25 +224,37 @@ export default function CourseDetailsScreen() {
                       <Text style={styles.smallEnrollBtnText}>Enroll</Text>
                     </TouchableOpacity>
                   </View>
-                ) : (
+                ) : null}
                   <View style={styles.lessonsList}>
-                    {lessons.map((lesson, idx) => (
-                      <TouchableOpacity 
-                        key={lesson.id} 
-                        style={styles.lessonItem}
-                        onPress={() => navigation.navigate('VideoPlayer', { courseId })}
-                      >
-                        <View style={styles.lessonIndex}>
-                          <Text style={styles.lessonIndexText}>{idx + 1}</Text>
-                        </View>
-                        <View style={styles.lessonInfo}>
-                          <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                          <Text style={styles.lessonDuration}>{lesson.duration}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
+                    {lessons.map((lesson, idx) => {
+                      const isLocked = !isEnrolled && idx > 0;
+                      return (
+                        <TouchableOpacity 
+                          key={lesson.id} 
+                          style={[styles.lessonItem, isLocked && styles.lessonItemLocked]}
+                          onPress={() => {
+                            if (isLocked) {
+                              handleCourseEnroll();
+                            } else {
+                              navigation.navigate('VideoPlayer', { courseId });
+                            }
+                          }}
+                        >
+                          <View style={styles.lessonIconWrapper}>
+                             {isLocked ? (
+                               <Lock size={18} color={Colors.silver} />
+                             ) : (
+                               <PlayCircle size={18} color={Colors.brandBlue} />
+                             )}
+                          </View>
+                          <View style={styles.lessonInfo}>
+                            <Text style={[styles.lessonTitle, isLocked && styles.lessonTitleLocked]}>{lesson.title}</Text>
+                            <Text style={styles.lessonDuration}>{lesson.duration}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                )}
               </View>
             )}
 
@@ -241,10 +267,22 @@ export default function CourseDetailsScreen() {
 
         </ScrollView>
       </View>
+
+      <View style={[styles.stickyFooter, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+
+        {isEnrolled ? (
+          <TouchableOpacity style={[styles.footerBtn, styles.resumeBtn]} onPress={() => navigation.navigate('VideoPlayer', { courseId })}>
+            <Text style={styles.footerBtnText}>Resume Course</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.footerBtn, styles.enrollBtn]} onPress={handleCourseEnroll}>
+            <Text style={styles.footerBtnText}>Enroll Now</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
-
 
 const luminoShadow = {
   shadowColor: Colors.navy,
@@ -255,7 +293,7 @@ const luminoShadow = {
 };
 
 const styles = StyleSheet.create({
- container: {
+  container: {
     flex: 1,
     backgroundColor: Colors.offWhite,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
@@ -271,7 +309,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',
   },
   scrollContent: {
-    flexGrow: 1, // ✅ updated
+    flexGrow: 1,
   },
   center: {
     flex: 1,
@@ -279,7 +317,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.offWhite,
   },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,6 +330,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
+  },
+  backBtn: {
+    padding: 4,
   },
   heroImage: {
     width: '100%',
@@ -337,18 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.silver,
     fontFamily: 'Inter_500Medium',
-  },
-  enrollBtn: {
-    backgroundColor: Colors.brandBlue,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  enrollBtnText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
   },
   tabs: {
     flexDirection: 'row',
@@ -458,19 +486,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight,
     ...luminoShadow,
   },
-  lessonIndex: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.offWhite,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  lessonItemLocked: {
+    opacity: 0.7,
   },
-  lessonIndexText: {
-    fontSize: 14,
-    color: Colors.silver,
-    fontFamily: 'Inter_600SemiBold',
+  lessonIconWrapper: {
+    width: 32,
+    alignItems: 'flex-start',
   },
   lessonInfo: {
     flex: 1,
@@ -481,9 +502,66 @@ const styles = StyleSheet.create({
     color: Colors.navy,
     marginBottom: 4,
   },
+  lessonTitleLocked: {
+    color: Colors.silver,
+  },
   lessonDuration: {
     fontSize: 12,
     color: Colors.silver,
     fontFamily: 'Inter_400Regular',
+  },
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    ...luminoShadow,
+  },
+  footerBtn: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enrollBtn: {
+    backgroundColor: Colors.brandBlue,
+  },
+  resumeBtn: {
+    backgroundColor: Colors.navy,
+  },
+  footerBtnText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+  },
+  learnGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 24,
+    gap: 12,
+  },
+  learnItem: {
+    width: '45%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkIcon: {
+    marginTop: 2,
+    marginRight: 8,
+  },
+  learnText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.navy,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 20,
   },
 });

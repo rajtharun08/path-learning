@@ -91,15 +91,14 @@ export default function PathsScreen() {
           
           <View style={styles.searchContainer}>
             <View style={styles.searchBar}>
+              <SearchIcon size={20} color={Colors.silver} style={styles.searchIcon} />
               <TextInput 
                 style={styles.searchInput}
                 placeholder="Search learning paths" 
+                placeholderTextColor={Colors.silver}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
-              <TouchableOpacity style={styles.searchSubmit}>
-                <SearchIcon size={20} color="white" />
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -175,7 +174,7 @@ export default function PathsScreen() {
 }
 
 const luminoShadow = {
-  shadowColor: '#040D43',
+  shadowColor: Colors.navy,
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.08,
   shadowRadius: 12,
@@ -198,16 +197,16 @@ const styles = StyleSheet.create({
   webContentWrapper: {
     width: '100%',
     maxWidth: 800,
-    backgroundColor: Colors.bgWhite,
+    backgroundColor: Colors.white,
     flex: 1,
-    boxShadow: '0 0 20px rgba(0,0,0,0.1)',
+    boxShadow: '0 0 20px rgba(4,13,67,0.05)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight2,
+    borderBottomColor: Colors.surface,
     gap: 12,
   },
   headerTitle: {
@@ -216,7 +215,7 @@ const styles = StyleSheet.create({
     color: Colors.navy,
   },
   topSection: {
-    padding: 20,
+    padding: 24,
   },
   subtitle: {
     fontSize: 14,
@@ -253,30 +252,26 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    overflow: 'hidden',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 54,
     ...luminoShadow,
+  },
+  searchIcon: {
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    padding: 12,
-    fontSize: 14,
+    height: '100%',
+    fontSize: 15,
     color: Colors.navy,
     fontFamily: 'Inter_400Regular',
   },
-  searchSubmit: {
-    backgroundColor: Colors.brandBlue,
-    width: 48,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   section: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    marginBottom: 32,
+    paddingHorizontal: 24,
   },
   sectionTitleMain: {
     fontSize: 18,
@@ -348,8 +343,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
   },
   pathsList: {
-    padding: 20,
-    gap: 16,
+    padding: 24,
+    gap: 20,
   },
   pathCard: {
     backgroundColor: Colors.white,

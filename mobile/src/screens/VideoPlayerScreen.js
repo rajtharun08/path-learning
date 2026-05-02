@@ -120,7 +120,7 @@ export default function VideoPlayerScreen() {
     if (syllabus.length > 0) {
       const completedCount = syllabus.filter(s => s.completed).length;
       const pct = (completedCount / syllabus.length) * 100;
-      setCourseProgress(Number.isInteger(pct) ? pct : parseFloat(pct.toFixed(2)));
+      setCourseProgress(Math.round(pct));
     }
   }, [syllabus]);
 
@@ -289,9 +289,12 @@ export default function VideoPlayerScreen() {
                    <Text style={styles.progressValue}>You've watched {Math.round((courseProgress/100) * syllabus.length)} of {syllabus.length} lessons</Text>
                 </View>
              </View>
-             <TouchableOpacity style={styles.viewCourseChip}>
-                 <Text style={styles.viewCourseText}>View Course &gt;</Text>
-             </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.viewCourseChip}
+                onPress={() => navigation.navigate('CourseDetails', { courseId })}
+              >
+                  <Text style={styles.viewCourseText}>View Course &gt;</Text>
+              </TouchableOpacity>
           </View>
         </View>
 

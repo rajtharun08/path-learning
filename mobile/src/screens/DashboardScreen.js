@@ -170,14 +170,27 @@ export default function DashboardScreen() {
                   >
                     <Image source={{ uri: course.img }} style={styles.courseImage} />
                     <View style={styles.courseInfo}>
-                      <Text style={styles.courseCat}>{course.category}</Text>
-                      <Text style={styles.courseTitle} numberOfLines={2}>{course.title}</Text>
-                      <View style={styles.courseMeta}>
-                        <View style={styles.ratingRow}>
-                          <Star size={14} fill={Colors.canary} color={Colors.canary} />
-                          <Text style={styles.ratingText}> {course.rating}</Text>
-                        </View>
-                        <Text style={styles.studentsText}>{course.students} students</Text>
+                      <Text style={styles.courseTitle} numberOfLines={1}>{course.title}</Text>
+                      
+                      <View style={styles.ratingRow}>
+                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                        <Text style={styles.ratingText}> {course.rating}</Text>
+                      </View>
+                      
+                      <Text style={styles.courseDesc} numberOfLines={1}>10 Foundations of {course.category || 'Intelligence'}</Text>
+                      
+                      <View style={styles.courseFooter}>
+                        <Text style={styles.progressTextSmall}>0% complete</Text>
+                        <TouchableOpacity 
+                          style={styles.startBtn}
+                          onPress={() => navigation.navigate('CourseDetails', { courseId: course.id })}
+                        >
+                          <Text style={styles.startBtnText}>View Course</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -370,48 +383,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.white,
     borderRadius: 16,
-    overflow: 'hidden',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
     ...luminoShadow,
-    marginBottom: 4,
+    marginBottom: 12,
+    alignItems: 'center',
   },
   courseImage: {
-    width: 100,
-    height: 100,
+    width: 120,
+    height: 80,
+    borderRadius: 8,
   },
   courseInfo: {
     flex: 1,
-    padding: 12,
+    marginLeft: 12,
     justifyContent: 'center',
-  },
-  courseCat: {
-    fontSize: 11,
-    color: Colors.brandBlue,
-    fontFamily: 'Inter_700Bold',
-    marginBottom: 4,
   },
   courseTitle: {
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
-    marginBottom: 8,
-  },
-  courseMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   ratingText: {
     fontSize: 12,
-    color: Colors.navy,
-    fontFamily: 'Inter_700Bold',
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+    marginLeft: 4,
   },
-  studentsText: {
+  courseDesc: {
+    fontSize: 12,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
+    marginBottom: 8,
+  },
+  courseFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  progressTextSmall: {
     fontSize: 11,
     color: Colors.silver,
     fontFamily: 'Inter_500Medium',
+  },
+  startBtn: {
+    flexDirection: 'row',
+    backgroundColor: Colors.brandBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  startBtnText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
   },
 });
