@@ -32,7 +32,7 @@ A premium mobile learning experience built with React Native and Expo, designed 
 
 1. Navigate to the mobile directory:
    ```bash
-   cd mobile
+   cd frontend/mobile
    ```
 
 2. Install dependencies:

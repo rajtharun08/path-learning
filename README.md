@@ -7,7 +7,7 @@ A comprehensive microservices ecosystem that transforms YouTube content into a s
 This platform consists of three primary components:
 1. **YouTube Learning Platform** - Core microservices ecosystem (5 services + API Gateway)
 2. **Path Service** - Advanced microservice for creating and managing structured learning paths
-3. **Client Application** - Modern Mobile (React Native) frontend
+3. **Client Application** - Modern Mobile (React Native) frontend located in `frontend/mobile`
 
 The Path Service integrates with the YouTube Learning Platform by consuming the Content Service and Progress Service to enrich learning paths with metadata and progress tracking.
 
@@ -366,7 +366,7 @@ All YouTube platform endpoints are accessible through the API Gateway at `http:/
    ```
 4. Launch the platform:
    ```bash
-   cd youtube_service
+   cd backend/youtube_service
    docker-compose up --build -d
    ```
 5. Access API documentation at: `http://localhost:8000/docs`
@@ -375,7 +375,7 @@ All YouTube platform endpoints are accessible through the API Gateway at `http:/
 
 1. Install dependencies:
    ```bash
-   cd path-service
+   cd backend/path-service
    pip install -r requirements.txt
    ```
 2. Configure environment variables in `path-service/.env` or set environment variables:
@@ -392,6 +392,19 @@ All YouTube platform endpoints are accessible through the API Gateway at `http:/
    uvicorn main:app --host 0.0.0.0 --port 8006
    ```
 5. Access API documentation at: `http://localhost:8006/docs`
+
+### Mobile App Setup
+
+1. Install dependencies:
+   ```bash
+   cd frontend/mobile
+   npm install
+   ```
+2. Start the development server:
+   ```bash
+   npx expo start
+   ```
+3. Open in **Expo Go** on your device.
 
 ### Environment Variables
 
@@ -452,19 +465,21 @@ Communication between services occurs through well-defined HTTP APIs.
 ## Project Structure
 ```
 path-learning/
-├── youtube-service/          # YouTube Learning Platform (5 microservices)
-│   ├── services/             # Individual microservices
-│   ├── diagrams/             # Architecture and ERD diagrams
-│   ├── docker-compose.yml    # Container orchestration
-│   └── README.md             # Detailed platform documentation
-├── path-service/             # Path Service microservice
-│   ├── app/                  # Application source code
-│   ├── README.md             # Service documentation
-│   ├── main.py               # Application entry point
-│   └── requirements.txt      # Python dependencies
-├── mobile/                   # React Native / Expo Mobile Application
-│   ├── src/                  # Mobile source code
-│   └── README.md             # Mobile documentation
+├── backend/                  # All backend services
+│   ├── youtube-service/      # YouTube Learning Platform (5 microservices)
+│   │   ├── services/         # Individual microservices
+│   │   ├── diagrams/         # Architecture and ERD diagrams
+│   │   ├── docker-compose.yml# Container orchestration
+│   │   └── README.md         # Detailed platform documentation
+│   └── path-service/         # Path Service microservice
+│       ├── app/              # Application source code
+│       ├── README.md         # Service documentation
+│       ├── main.py           # Application entry point
+│       └── requirements.txt  # Python dependencies
+├── frontend/                 # Client applications
+│   └── mobile/               # React Native / Expo Mobile Application
+│       ├── src/              # Mobile source code
+│       └── README.md         # Mobile documentation
 └── README.md                 # This file
 ```
 
