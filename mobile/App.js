@@ -14,7 +14,7 @@ export default function App() {
       <SafeAreaProvider>
         <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }}>
           <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: '#ffffff' }}>
-            <Text style={{ color: '#07125E', fontSize: 22, fontWeight: 'bold', fontStyle: 'italic', textAlign: 'left' }}>Hexaware Luminous</Text>
+            <Text style={{ color: '#0A56F1', fontSize: 22, fontWeight: 'bold', fontStyle: 'italic', textAlign: 'left' }}>Hexaware Lumino</Text>
           </View>
           <NavigationContainer>
             <AppNavigator />

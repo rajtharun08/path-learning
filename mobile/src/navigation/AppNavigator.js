@@ -4,7 +4,7 @@ import MainTabNavigator from './MainTabNavigator';
 import CourseDetailsScreen from '../screens/CourseDetailsScreen';
 import LearningPathScreen from '../screens/LearningPathScreen';
 import VideoPlayerScreen from '../screens/VideoPlayerScreen';
-
+// 
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
