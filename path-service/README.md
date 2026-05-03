@@ -197,11 +197,19 @@ Response:
 
 `GET /paths/search?q={keyword}`
 
-Searches path title and description, then ranks results using:
+Searches path title and description, then ranks results using a multi-factor quality score.
 
-```text
-Total Score = (0.4 * Normalized Views) + (0.4 * Completion Rate) + (0.2 * Normalized Rating)
-```
+### Get Top Paths
+
+`GET /paths/top?limit=10`
+
+Returns a list of high-quality learning paths ranked by completion rate, ratings, views, and enrollment volume. Used for "Featured" or "Popular" sections.
+
+### Get Learning History
+
+`GET /paths/{path_id}/history?user_id={id}`
+
+Returns the audit log of progress updates and events for a user within a specific path.
 
 ## Local Development
 

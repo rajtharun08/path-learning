@@ -30,8 +30,15 @@ async def proxy_playlist(request: Request, path: str = ""):
 @limiter.limit("100/minute")
 async def proxy_video(request: Request, path: str = ""):
     target_path = f"/{path}" if path else ""
-    if path.startswith("progress") or path.startswith("resume"):
+    # Progress and Resume go to Progress Service
+    if path.startswith("progress") or path.startswith("resume") or path.startswith("bookmark") or path.startswith("notes"):
         return await proxy_request(request, f"{settings.progress_service_url}/video{target_path}", "progress-service")
+    
+    # Analytics event goes to Analytics Service
+    if path.startswith("event"):
+        return await proxy_request(request, f"{settings.analytics_service_url}/video{target_path}", "analytics-service")
+        
+    # Other video requests (metadata, next) go to Content Service
     return await proxy_request(request, f"{settings.content_service_url}/video{target_path}", "content-service")
 
 

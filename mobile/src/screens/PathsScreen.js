@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search as SearchIcon, Star } from 'lucide-react-native';
+import { Search as SearchIcon, Star, ChevronRight, Layers } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
 import { API_URLS, USER_ID } from '../constants/Config';
@@ -145,24 +145,28 @@ export default function PathsScreen() {
                 style={styles.pathCard} 
                 onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
               >
-                <View style={styles.pathHeader}>
-                  <Text style={styles.pathTitle}>{path.title}</Text>
-                  <View style={styles.ratingRow}>
-                    <Star size={14} fill={Colors.canary} color={Colors.canary} />
-                    <Text style={styles.ratingText}> {path.rating}</Text>
+                <View style={styles.pathIconWrapper}>
+                  <Layers size={24} color={Colors.brandBlue} />
+                </View>
+                
+                <View style={styles.pathContent}>
+                  <View style={styles.pathHeader}>
+                    <Text style={styles.pathTitle} numberOfLines={1}>{path.title}</Text>
+                    <View style={styles.ratingRow}>
+                      <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                      <Text style={styles.ratingText}> {path.rating}</Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.pathDesc} numberOfLines={2}>{path.desc}</Text>
+                  
+                  <View style={styles.pathFooter}>
+                    <View style={styles.pathMeta}>
+                      <Text style={styles.metaText}>{path.duration}  ·  {path.enrollments} enrolled</Text>
+                    </View>
+                    <ChevronRight size={18} color={Colors.silver} />
                   </View>
                 </View>
-                <Text style={styles.pathDesc}>{path.desc}</Text>
-                <View style={styles.pathMeta}>
-                  <Text style={styles.metaText}>Total Time: {path.duration}</Text>
-                  <Text style={styles.metaText}>Enrollments: {path.enrollments}</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.viewBtn}
-                  onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
-                >
-                  <Text style={styles.viewBtnText}>View Path</Text>
-                </TouchableOpacity>
               </TouchableOpacity>
             ))
           )}
@@ -347,24 +351,38 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   pathCard: {
+    flexDirection: 'row',
     backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
     ...luminoShadow,
+    borderWidth: 1,
+    borderColor: Colors.surface,
+  },
+  pathIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: Colors.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  pathContent: {
+    flex: 1,
   },
   pathHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   pathTitle: {
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
     flex: 1,
+    marginRight: 8,
   },
   ratingRow: {
     flexDirection: 'row',
@@ -376,31 +394,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
   pathDesc: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.silver,
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 18,
+    marginBottom: 12,
     fontFamily: 'Inter_400Regular',
+  },
+  pathFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   pathMeta: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    alignItems: 'center',
   },
   metaText: {
     fontSize: 12,
     color: Colors.silver,
     fontFamily: 'Inter_500Medium',
-  },
-  viewBtn: {
-    backgroundColor: Colors.brandBlue,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  viewBtnText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontFamily: 'Inter_700Bold',
   },
 });

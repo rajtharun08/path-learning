@@ -4,9 +4,10 @@ A comprehensive microservices ecosystem that transforms YouTube content into a s
 
 ## Overview
 
-This platform consists of two primary components:
+This platform consists of three primary components:
 1. **YouTube Learning Platform** - Core microservices ecosystem (5 services + API Gateway)
-2. **Path Service** - Additional microservice for creating and managing structured learning paths
+2. **Path Service** - Advanced microservice for creating and managing structured learning paths
+3. **Client Applications** - Modern Web (React) and Mobile (React Native) frontends
 
 The Path Service integrates with the YouTube Learning Platform by consuming the Content Service and Progress Service to enrich learning paths with metadata and progress tracking.
 
@@ -71,6 +72,12 @@ graph TD
 - Ranked search functionality across paths
 - User enrollment and tracking for learning paths
 - Special handling for final lessons: returns "Take Assessment" as next action instead of "Next Lesson"
+
+### Client Applications (Mobile & Web)
+- **Hexaware Luminous Design**: Premium, sleek aesthetic with dark mode and vibrant accents.
+- **Cross-Platform Access**: Seamless learning experience across Web and Mobile (React Native).
+- **Dynamic Interactions**: Real-time progress bars, video bookmarks, and timestamped notes.
+- **Optimized Performance**: Shimmer effects and skeleton loaders for zero-latency perception.
 
 ## Data Models
 
@@ -279,6 +286,12 @@ GET /paths/search?q={keyword}
 ```
 Searches learning paths by title and description with relevance ranking.
 
+#### Get Top Paths
+```
+GET /paths/top?limit=10
+```
+Returns high-quality paths ranked by completion, ratings, and views.
+
 #### Get Course Detail
 ```
 GET /courses/{playlist_id}
@@ -290,6 +303,12 @@ Returns a full course detail payload for a specific playlist, including lesson-l
 GET /users/{user_id}/enrolled-paths
 ```
 Returns a list of paths the user has started, including their real-time progress percentages, specifically optimized for the "Continue Learning" dashboard section.
+
+#### Get Learning History
+```
+GET /paths/{path_id}/history?user_id={id}
+```
+Returns the audit log of progress updates and events.
 
 ### YouTube Platform Endpoints (via API Gateway)
 
@@ -415,21 +434,12 @@ Communication between services occurs through well-defined HTTP APIs.
 - Only API Gateway port (8000) is exposed externally
 - Internal service communication uses Docker hostname resolution
 
-## Technology Stack
-
-### YouTube Learning Platform
-- **Framework**: FastAPI
-- **Containerization**: Docker & Docker Compose
-- **Service Discovery**: Docker networking
-- **Communication**: REST/HTTP
-- **Databases**: PostgreSQL (per service)
-
-### Path Service
-- **Framework**: FastAPI
-- **Language**: Python 3.8+
-- **ORM**: SQLAlchemy with asyncpg
-- **HTTP Client**: httpx
-- **Database**: PostgreSQL
+### Client Applications
+- **Web Framework**: React 18+ with Vite
+- **Mobile Framework**: React Native with Expo
+- **Styling**: Vanilla CSS (Web) & Native StyleSheet (Mobile)
+- **UI Standards**: Hexaware Luminous Design System
+- **Icons**: Lucide React / Lucide React Native
 
 ## Project Structure
 ```
@@ -444,6 +454,12 @@ path-learning/
 │   ├── README.md             # Service documentation
 │   ├── main.py               # Application entry point
 │   └── requirements.txt      # Python dependencies
+├── mobile/                   # React Native / Expo Mobile Application
+│   ├── src/                  # Mobile source code
+│   └── README.md             # Mobile documentation
+├── frontend/                 # React / Vite Web Application
+│   ├── src/                  # Frontend source code
+│   └── README.md             # Web documentation
 └── README.md                 # This file
 ```
 

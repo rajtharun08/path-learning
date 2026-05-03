@@ -73,6 +73,8 @@ _Note: This service uses a Cache-First pattern. Hitting a GET endpoint for the f
 | :--- | :--- | :--- |
 | `GET` | `/playlist/{playlist_id}` | Provide a YouTube Playlist ID. The backend will instantly import all videos to the DB. |
 | `GET` | `/playlist/all` | Returns a paginated list of all imported courses. |
+| `POST`| `/playlist` | `{"youtube_playlist_id": "id", "title": "...", "description": "..."}`<br>Manually create a course record. |
+| `PUT` | `/playlist/{playlist_id}` | Update metadata for an existing course. |
 | `GET` | `/playlist/search?q={query}` | Search for YouTube playlists by query string. Returns matching playlists with metadata. |
 | `GET` | `/video/metadata/{video_id}` | Provide a single YouTube Video ID. Returns the title, duration, and **a ready-to-use HTML iframe embed code**. |
 | `GET` | `/video/next/{video_id}` | Returns the chronological next video in the sequence. |
@@ -85,14 +87,15 @@ _Note: This service uses a Cache-First pattern. Hitting a GET endpoint for the f
 | `GET`  | `/video/resume/{video_id}?user_id={id}`         | Returns exactly what second the user left off at (or 0 if completed).                                                                                                          |
 | `GET`  | `/course/{playlist_id}/progress?user_id={id}`   | Returns course-wide stats (e.g. "Completed 3/10 videos").                                                                                                                      |
 | `GET`  | `/course/{playlist_id}/completion?user_id={id}` | Returns an assessment boolean `course_completed: true` if watched > 90%.                                                                                                       |
-| `POST` | `/video/note`                                   | `{"user_id": "uuid", "video_id": "yt_id", "content": "note text", "video_timestamp": 45}`<br>_Persists a timestamped note for a specific video._                               |
-| `GET`  | `/video/notes?user_id={user_id}&video_id={vid}`  | Returns all notes for a specific video.                                                                                                                                        |
-| `POST` | `/video/bookmark/toggle`                        | `{"user_id": "uuid", "video_id": "yt_id"}`<br>_Toggles the bookmark status for a video._                                                                                       |
+| `POST` | `/video/notes`                                  | `{"user_id": "uuid", "video_id": "yt_id", "content": "note text", "video_timestamp": 45}`<br>_Persists a timestamped note for a specific video._                               |
+| `GET`  | `/video/notes/{video_id}?user_id={user_id}`      | Returns all notes for a specific video.                                                                                                                                        |
+| `POST` | `/video/bookmark`                               | `{"user_id": "uuid", "video_id": "yt_id"}`<br>_Toggles the bookmark status for a video._                                                                                       |
 
 ### 📊 Analytics Module (`/analytics`)
 
 | Method | Endpoint                        | JSON Payload / Notes                                                                       |
 | :----- | :------------------------------ | :----------------------------------------------------------------------------------------- |
+| `POST` | `/video/event`                  | Record low-level interaction events (play, pause, seek).                                   |
 | `GET`  | `/analytics/dropoff/{video_id}` | Indicates the exact second in the video where the majority of users click "pause" or skip. |
 | `GET`  | `/analytics/popular?limit=10`   | Generates a platform-wide leaderboard based on Play events and Completion rates.           |
 
