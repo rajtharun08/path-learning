@@ -55,6 +55,19 @@ Constraint:
 
 - Unique `(user_id, path_id)`
 
+### `learning_history`
+
+- `id` integer primary key
+- `user_id` UUID
+- `path_id` foreign key to `learning_paths.path_id`
+- `event_type` string (e.g., 'enrolled', 'progress_updated')
+- `total_courses` integer
+- `completed_courses` integer
+- `remaining_courses` integer
+- `progress_percentage` float
+- `next_up_playlist_id` string, optional
+- `created_at` timestamp with time zone
+
 ## Dependencies
 
 Path Service calls these downstream services:
@@ -235,10 +248,24 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8006
 ```
 
-### Docs
-
 - Swagger UI: `http://localhost:8006/docs`
 - ReDoc: `http://localhost:8006/redoc`
+
+### Docker Setup (Recommended)
+
+To run the Path Service and its database using Docker:
+
+1. Build and start the containers:
+   ```bash
+   docker-compose up --build -d
+   ```
+   This will spin up:
+   - `path-db`: PostgreSQL database on internal port 5432 (host port 5433).
+   - `path-service`: The FastAPI application on port 8006.
+
+2. Access the API documentation at `http://localhost:8006/docs`.
+
+**Note on Networking**: The Docker setup uses `host.docker.internal` to communicate with other services (Content, Progress) if they are running on your host machine (e.g., via a separate Docker Compose or directly). Ensure your host's firewall allows these connections.
 
 ## Notes
 

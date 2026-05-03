@@ -7,7 +7,7 @@ A comprehensive microservices ecosystem that transforms YouTube content into a s
 This platform consists of three primary components:
 1. **YouTube Learning Platform** - Core microservices ecosystem (5 services + API Gateway)
 2. **Path Service** - Advanced microservice for creating and managing structured learning paths
-3. **Client Applications** - Modern Web (React) and Mobile (React Native) frontends
+3. **Client Application** - Modern Mobile (React Native) frontend
 
 The Path Service integrates with the YouTube Learning Platform by consuming the Content Service and Progress Service to enrich learning paths with metadata and progress tracking.
 
@@ -73,9 +73,9 @@ graph TD
 - User enrollment and tracking for learning paths
 - Special handling for final lessons: returns "Take Assessment" as next action instead of "Next Lesson"
 
-### Client Applications (Mobile & Web)
+### Client Application (Mobile)
 - **Hexaware Luminous Design**: Premium, sleek aesthetic with dark mode and vibrant accents.
-- **Cross-Platform Access**: Seamless learning experience across Web and Mobile (React Native).
+- **Native Experience**: Seamless learning journey on iOS and Android via React Native.
 - **Dynamic Interactions**: Real-time progress bars, video bookmarks, and timestamped notes.
 - **Optimized Performance**: Shimmer effects and skeleton loaders for zero-latency perception.
 
@@ -106,9 +106,18 @@ erDiagram
         uuid path_id FK
         timestamp enrolled_at
     }
+    LEARNING_HISTORY {
+        int id PK
+        uuid user_id
+        uuid path_id FK
+        varchar event_type
+        float progress_percentage
+        timestamp created_at
+    }
     
     LEARNING_PATHS ||..o{ PATH_ITEMS : contains
     LEARNING_PATHS ||..o{ PATH_ENROLLMENTS : has
+    LEARNING_PATHS ||..o{ LEARNING_HISTORY : logs
 ```
 
 ### YouTube Platform Database Schema (per service)
@@ -434,12 +443,11 @@ Communication between services occurs through well-defined HTTP APIs.
 - Only API Gateway port (8000) is exposed externally
 - Internal service communication uses Docker hostname resolution
 
-### Client Applications
-- **Web Framework**: React 18+ with Vite
+### Client Application
 - **Mobile Framework**: React Native with Expo
-- **Styling**: Vanilla CSS (Web) & Native StyleSheet (Mobile)
+- **Styling**: Native StyleSheet
 - **UI Standards**: Hexaware Luminous Design System
-- **Icons**: Lucide React / Lucide React Native
+- **Icons**: Lucide React Native
 
 ## Project Structure
 ```
@@ -457,9 +465,6 @@ path-learning/
 ├── mobile/                   # React Native / Expo Mobile Application
 │   ├── src/                  # Mobile source code
 │   └── README.md             # Mobile documentation
-├── frontend/                 # React / Vite Web Application
-│   ├── src/                  # Frontend source code
-│   └── README.md             # Web documentation
 └── README.md                 # This file
 ```
 
