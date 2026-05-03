@@ -6,6 +6,7 @@ import {
   TouchableOpacity, 
   TextInput, 
   ScrollView,
+  Image,
   ActivityIndicator,
   Platform
 } from 'react-native';
@@ -75,9 +76,19 @@ export default function PathsScreen() {
   return (
     <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
       <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Paths Directory</Text>
-      </View>
+        <View style={styles.header}>
+          <Text style={styles.welcomeText}>Paths Directory</Text>
+          <View style={styles.searchBar}>
+            <SearchIcon size={20} color={Colors.textSilver} />
+            <TextInput 
+              style={styles.searchInput}
+              placeholder="Search learning paths..." 
+              placeholderTextColor={Colors.silver}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        </View>
 
       <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.topSection}>
@@ -85,22 +96,9 @@ export default function PathsScreen() {
           
           <View style={styles.sectionTitleRow}>
             <View style={styles.blueBar} />
-            <Text style={styles.sectionTitle}>All paths</Text>
+            <Text style={styles.sectionTitle}>Featured Paths</Text>
           </View>
           <Text style={styles.sectionDesc}>Browse and find all public Hexaware paths here.</Text>
-          
-          <View style={styles.searchContainer}>
-            <View style={styles.searchBar}>
-              <SearchIcon size={20} color={Colors.silver} style={styles.searchIcon} />
-              <TextInput 
-                style={styles.searchInput}
-                placeholder="Search learning paths" 
-                placeholderTextColor={Colors.silver}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-          </View>
         </View>
 
         {/* Continue Learning */}
@@ -146,25 +144,31 @@ export default function PathsScreen() {
                 onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
               >
                 <View style={styles.pathIconWrapper}>
-                  <Layers size={24} color={Colors.brandBlue} />
+                  <Layers size={22} color={Colors.brandBlue} />
                 </View>
                 
-                <View style={styles.pathContent}>
-                  <View style={styles.pathHeader}>
-                    <Text style={styles.pathTitle} numberOfLines={1}>{path.title}</Text>
-                    <View style={styles.ratingRow}>
-                      <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                      <Text style={styles.ratingText}> {path.rating}</Text>
-                    </View>
+                <View style={styles.pathInfo}>
+                  <Text style={styles.pathTitle} numberOfLines={1}>{path.title}</Text>
+                  
+                  <View style={styles.ratingRow}>
+                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
+                    <Text style={styles.ratingText}> {path.rating}</Text>
                   </View>
                   
-                  <Text style={styles.pathDesc} numberOfLines={2}>{path.desc}</Text>
+                  <Text style={styles.pathDesc} numberOfLines={1}>{path.desc}</Text>
                   
                   <View style={styles.pathFooter}>
-                    <View style={styles.pathMeta}>
-                      <Text style={styles.metaText}>{path.duration}  ·  {path.enrollments} enrolled</Text>
-                    </View>
-                    <ChevronRight size={18} color={Colors.silver} />
+                    <Text style={styles.metaText}>{path.duration}</Text>
+                    <TouchableOpacity 
+                      style={styles.viewBtn}
+                      onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
+                    >
+                      <Text style={styles.viewBtnText}>View Path</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -206,20 +210,34 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surface,
-    gap: 12,
+    padding: 24,
+    backgroundColor: Colors.offWhite,
   },
-  headerTitle: {
-    fontSize: 18,
+  welcomeText: {
+    fontSize: 24,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
+    marginBottom: 16,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    padding: 14,
+    borderRadius: 12,
+    ...luminoShadow,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 14,
+    color: Colors.navy,
+    fontFamily: 'Inter_400Regular',
   },
   topSection: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   subtitle: {
     fontSize: 14,
@@ -251,28 +269,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Inter_400Regular',
   },
-  searchContainer: {
-    marginBottom: 24,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 54,
-    ...luminoShadow,
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 15,
-    color: Colors.navy,
-    fontFamily: 'Inter_400Regular',
-  },
   section: {
     marginBottom: 32,
     paddingHorizontal: 24,
@@ -287,18 +283,16 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   continueCard: {
-    width: 200,
+    width: 220,
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginRight: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
     ...luminoShadow,
   },
   cardTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
     color: Colors.navy,
     marginBottom: 12,
   },
@@ -319,99 +313,106 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 11,
     color: Colors.silver,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
   },
   resumeBtn: {
     backgroundColor: Colors.brandBlue,
-    padding: 8,
     borderRadius: 8,
+    padding: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
   },
   resumeBtnText: {
     color: Colors.white,
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
   },
   emptyState: {
     padding: 24,
     backgroundColor: Colors.white,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.surface,
   },
   emptyText: {
     color: Colors.silver,
     fontSize: 13,
-    textAlign: 'center',
     fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
   },
   pathsList: {
-    padding: 24,
-    gap: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 16,
   },
   pathCard: {
     flexDirection: 'row',
     backgroundColor: Colors.white,
     borderRadius: 16,
-    padding: 16,
-    ...luminoShadow,
+    padding: 12,
     borderWidth: 1,
-    borderColor: Colors.surface,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
+    alignItems: 'center',
   },
   pathIconWrapper: {
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     borderRadius: 12,
     backgroundColor: Colors.offWhite,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
   },
-  pathContent: {
+  pathInfo: {
     flex: 1,
-  },
-  pathHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    marginLeft: 12,
+    justifyContent: 'center',
   },
   pathTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
-    flex: 1,
-    marginRight: 8,
+    marginBottom: 4,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
   },
   ratingText: {
     fontSize: 12,
-    color: Colors.navy,
-    fontFamily: 'Inter_600SemiBold',
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+    marginLeft: 4,
   },
   pathDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.silver,
-    lineHeight: 18,
-    marginBottom: 12,
     fontFamily: 'Inter_400Regular',
+    marginBottom: 8,
   },
   pathFooter: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pathMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.silver,
     fontFamily: 'Inter_500Medium',
+  },
+  viewBtn: {
+    backgroundColor: Colors.brandBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  viewBtnText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
   },
 });
