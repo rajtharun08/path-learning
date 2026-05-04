@@ -25,7 +25,19 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError) -> JS
     )
 
 
+from fastapi.exceptions import RequestValidationError
+
+
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    logger.error("Validation error: %s", exc.errors())
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
+
+
 def add_exception_handlers(app: FastAPI, limiter) -> None:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
     app.add_exception_handler(Exception, generic_exception_handler)

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpen, Layers, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { BookOpen, Layers, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
 import { getAuthHeaders, getAuthSession } from '../constants/Auth';
@@ -87,6 +87,8 @@ export default function AdminCoursesScreen() {
   const [activeTab, setActiveTab] = useState('Courses'); // 'Courses' or 'Paths'
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [showCreatePath, setShowCreatePath] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState(null);
+  const [editingLessonId, setEditingLessonId] = useState(null);
 
   useEffect(() => {
     loadScreen();
@@ -151,15 +153,21 @@ export default function AdminCoursesScreen() {
 
   const createCourse = async () => {
     if (!courseForm.title.trim()) {
-      Alert.alert('Missing title', 'Add a course title before creating the course.');
+      Alert.alert('Missing title', 'Add a course title before saving.');
       return;
     }
 
     try {
       setSubmittingCourse(true);
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_URLS.PLAYLIST_SERVICE}/courses`, {
-        method: 'POST',
+      const isUpdating = Boolean(editingCourseId);
+      
+      const url = isUpdating 
+        ? `${API_URLS.PLAYLIST_SERVICE}/courses/${editingCourseId}`
+        : `${API_URLS.PLAYLIST_SERVICE}/courses`;
+        
+      const response = await fetch(url, {
+        method: isUpdating ? 'PUT' : 'POST',
         headers: {
           accept: 'application/json',
           'Content-Type': 'application/json',
@@ -173,22 +181,43 @@ export default function AdminCoursesScreen() {
             .split('\n')
             .map(item => item.trim())
             .filter(Boolean),
-          lessons: [],
+          lessons: isUpdating ? undefined : [],
         }),
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.detail || 'Failed to create course');
+        throw new Error(data?.detail || `Failed to ${isUpdating ? 'update' : 'create'} course`);
       }
 
       setCourseForm(emptyCourseForm);
+      setEditingCourseId(null);
       setSelectedCourseId(data.youtube_playlist_id);
       await fetchCourses();
+      if (isUpdating) setShowCreateCourse(false);
     } catch (error) {
-      Alert.alert('Course creation failed', error.message || 'Please try again.');
+      Alert.alert(`Course ${editingCourseId ? 'update' : 'creation'} failed`, error.message || 'Please try again.');
     } finally {
       setSubmittingCourse(false);
     }
+  };
+
+  const editCourse = (course) => {
+    setCourseForm({
+      title: course.title || '',
+      description: course.description || '',
+      outcomes: Array.isArray(course.outcomes) ? course.outcomes.join('\n') : (course.outcomes || ''),
+      thumbnail: course.thumbnail || '',
+      author_name: course.author_name || '',
+      resources: course.resources || [],
+    });
+    setEditingCourseId(course.youtube_playlist_id);
+    setShowCreateCourse(true);
+  };
+
+  const cancelEditCourse = () => {
+    setCourseForm(emptyCourseForm);
+    setEditingCourseId(null);
+    setShowCreateCourse(false);
   };
 
   const confirmAction = (title, message, onConfirm) => {
@@ -248,18 +277,20 @@ export default function AdminCoursesScreen() {
       Alert.alert('Missing title', 'Add a lesson title.');
       return;
     }
-    if (!lessonForm.duration.trim()) {
-      Alert.alert('Missing duration', 'Add the lesson duration in seconds.');
-      return;
-    }
 
     try {
       setSubmittingLesson(true);
+      const isUpdating = Boolean(editingLessonId);
       const selectedCourse = courses.find(course => course.youtube_playlist_id === selectedCourseId);
       const nextPosition = selectedCourse?.videos?.length || 0;
       const headers = await getAuthHeaders();
-      const response = await fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${selectedCourseId}/lessons`, {
-        method: 'POST',
+      
+      const url = isUpdating
+        ? `${API_URLS.PLAYLIST_SERVICE}/courses/${selectedCourseId}/lessons/${editingLessonId}`
+        : `${API_URLS.PLAYLIST_SERVICE}/courses/${selectedCourseId}/lessons`;
+
+      const response = await fetch(url, {
+        method: isUpdating ? 'PUT' : 'POST',
         headers: {
           accept: 'application/json',
           'Content-Type': 'application/json',
@@ -268,23 +299,39 @@ export default function AdminCoursesScreen() {
         body: JSON.stringify({
           youtube_url: lessonForm.youtube_url.trim(),
           title: lessonForm.title.trim(),
-          duration: parseInt(lessonForm.duration.trim()) || 0,
-          position: lessonForm.position.trim() !== '' ? parseInt(lessonForm.position.trim()) : nextPosition,
+          duration: lessonForm.duration.trim() !== '' ? parseInt(lessonForm.duration.trim()) : 0,
+          position: lessonForm.position.trim() !== '' ? parseInt(lessonForm.position.trim()) : (isUpdating ? undefined : nextPosition),
         }),
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.detail || 'Failed to add lesson');
+        throw new Error(data?.detail || `Failed to ${isUpdating ? 'update' : 'add'} lesson`);
       }
 
       setLessonForm(emptyLessonForm);
+      setEditingLessonId(null);
       await fetchCourses();
       setSelectedCourseId(data.youtube_playlist_id);
     } catch (error) {
-      Alert.alert('Lesson creation failed', error.message || 'Please try again.');
+      Alert.alert(`Lesson ${editingLessonId ? 'update' : 'creation'} failed`, error.message || 'Please try again.');
     } finally {
       setSubmittingLesson(false);
     }
+  };
+
+  const editLesson = (lesson) => {
+    setLessonForm({
+      youtube_url: lesson.youtube_url || `https://www.youtube.com/watch?v=${lesson.youtube_video_id}`,
+      title: lesson.title || '',
+      duration: String(lesson.duration || ''),
+      position: String(lesson.position || ''),
+    });
+    setEditingLessonId(lesson.id);
+  };
+
+  const cancelEditLesson = () => {
+    setLessonForm(emptyLessonForm);
+    setEditingLessonId(null);
   };
 
   const deleteLesson = (courseId, lessonId) => {
@@ -304,6 +351,31 @@ export default function AdminCoursesScreen() {
         }
         await fetchCourses();
         setSelectedCourseId(data.youtube_playlist_id);
+      } catch (error) {
+        Alert.alert('Delete failed', error.message || 'Please try again.');
+      }
+    });
+  };
+
+  const deletePath = (pathId) => {
+    confirmAction('Delete learning path', 'This will permanently remove the learning path.', async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}`, {
+          method: 'DELETE',
+          headers: {
+            accept: 'application/json',
+            ...headers,
+          },
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data?.detail || 'Failed to delete path');
+        }
+        if (managedPathId === pathId) {
+          setManagedPathId(null);
+        }
+        await fetchPaths();
       } catch (error) {
         Alert.alert('Delete failed', error.message || 'Please try again.');
       }
@@ -657,19 +729,28 @@ export default function AdminCoursesScreen() {
                   <Text style={styles.emptyText}>No paths found yet.</Text>
                 ) : (
                   paths.map((path) => (
-                    <TouchableOpacity
+                    <View
                       key={path.path_id}
                       style={[styles.courseCard, managedPathId === path.path_id && styles.courseCardActive]}
-                      onPress={() => loadPathItems(path.path_id)}
                     >
-                      <View style={styles.courseCardBody}>
+                      <TouchableOpacity
+                        style={styles.courseCardBody}
+                        onPress={() => loadPathItems(path.path_id)}
+                        activeOpacity={0.8}
+                      >
                         <Layers size={18} color={managedPathId === path.path_id ? Colors.brandBlue : Colors.navy} />
                         <View style={styles.courseCardText}>
                           <Text style={styles.courseTitle}>{path.title}</Text>
                           <Text style={styles.courseMeta} numberOfLines={1}>{path.description}</Text>
                         </View>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => deletePath(path.path_id)}
+                        style={styles.iconBtn}
+                      >
+                        <Trash2 size={18} color={Colors.danger} />
+                      </TouchableOpacity>
+                    </View>
                   ))
                 )}
               </View>
@@ -764,10 +845,10 @@ export default function AdminCoursesScreen() {
             <>
               <TouchableOpacity 
                 style={styles.expandableHeader} 
-                onPress={() => setShowCreateCourse(!showCreateCourse)}
+                onPress={() => editingCourseId ? cancelEditCourse() : setShowCreateCourse(!showCreateCourse)}
               >
-                <Text style={styles.sectionTitle}>Create New Course</Text>
-                <Plus size={20} color={Colors.brandBlue} style={{ transform: [{ rotate: showCreateCourse ? '45deg' : '0deg' }] }} />
+                <Text style={styles.sectionTitle}>{editingCourseId ? 'Update Course' : 'Create New Course'}</Text>
+                <Plus size={20} color={Colors.brandBlue} style={{ transform: [{ rotate: (showCreateCourse || editingCourseId) ? '45deg' : '0deg' }] }} />
               </TouchableOpacity>
 
               {showCreateCourse && (
@@ -856,11 +937,20 @@ export default function AdminCoursesScreen() {
                     disabled={submittingCourse}
                     onPress={createCourse}
                   >
-                    <Plus size={16} color={Colors.white} />
+                    {editingCourseId ? <Pencil size={16} color={Colors.white} /> : <Plus size={16} color={Colors.white} />}
                     <Text style={styles.primaryBtnText}>
-                      {submittingCourse ? 'Creating...' : 'Create Course'}
+                      {submittingCourse ? (editingCourseId ? 'Updating...' : 'Creating...') : (editingCourseId ? 'Update Course' : 'Create Course')}
                     </Text>
                   </TouchableOpacity>
+                  
+                  {editingCourseId && (
+                    <TouchableOpacity
+                      style={[styles.secondaryBtn, { marginTop: 8, borderColor: Colors.silver }]}
+                      onPress={cancelEditCourse}
+                    >
+                      <Text style={[styles.secondaryBtnText, { color: Colors.silver }]}>Cancel Edit</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -893,12 +983,20 @@ export default function AdminCoursesScreen() {
                           </View>
                         </TouchableOpacity>
                         {course.is_manual ? (
-                          <TouchableOpacity
-                            onPress={() => deleteCourse(course.youtube_playlist_id)}
-                            style={styles.iconBtn}
-                          >
-                            <Trash2 size={18} color={Colors.danger} />
-                          </TouchableOpacity>
+                          <View style={styles.row}>
+                            <TouchableOpacity
+                              onPress={() => editCourse(course)}
+                              style={styles.iconBtn}
+                            >
+                              <Pencil size={18} color={Colors.brandBlue} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => deleteCourse(course.youtube_playlist_id)}
+                              style={styles.iconBtn}
+                            >
+                              <Trash2 size={18} color={Colors.danger} />
+                            </TouchableOpacity>
+                          </View>
                         ) : null}
                       </View>
                     );
@@ -916,49 +1014,61 @@ export default function AdminCoursesScreen() {
                   </View>
 
                   {selectedCourseIsManual ? (
-                    <View style={styles.addLessonForm}>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="YouTube video URL"
-                        placeholderTextColor={Colors.silver}
-                        value={lessonForm.youtube_url}
-                        onChangeText={(value) => setLessonForm(current => ({ ...current, youtube_url: value }))}
-                      />
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Lesson title"
-                        placeholderTextColor={Colors.silver}
-                        value={lessonForm.title}
-                        onChangeText={(value) => setLessonForm(current => ({ ...current, title: value }))}
-                      />
-                      <View style={styles.inputRow}>
+                    <View>
+                      <Text style={styles.sectionTitle}>{editingLessonId ? 'Update Lesson' : 'Add New Lesson'}</Text>
+                      <View style={styles.addLessonForm}>
                         <TextInput
-                          style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                          placeholder="Duration (sec)"
+                          style={styles.input}
+                          placeholder="YouTube video URL"
                           placeholderTextColor={Colors.silver}
-                          value={lessonForm.duration}
-                          keyboardType="numeric"
-                          onChangeText={(value) => setLessonForm(current => ({ ...current, duration: value }))}
+                          value={lessonForm.youtube_url}
+                          onChangeText={(value) => setLessonForm(current => ({ ...current, youtube_url: value }))}
                         />
                         <TextInput
-                          style={[styles.input, { flex: 1, marginBottom: 0 }]}
-                          placeholder="Position"
+                          style={styles.input}
+                          placeholder="Lesson title"
                           placeholderTextColor={Colors.silver}
-                          value={lessonForm.position}
-                          keyboardType="numeric"
-                          onChangeText={(value) => setLessonForm(current => ({ ...current, position: value }))}
+                          value={lessonForm.title}
+                          onChangeText={(value) => setLessonForm(current => ({ ...current, title: value }))}
                         />
+                        <View style={styles.row}>
+                          <TextInput
+                            style={[styles.input, { flex: 1, marginRight: 8 }]}
+                            placeholder="Duration (sec)"
+                            placeholderTextColor={Colors.silver}
+                            keyboardType="numeric"
+                            value={lessonForm.duration}
+                            onChangeText={(value) => setLessonForm(current => ({ ...current, duration: value }))}
+                          />
+                          <TextInput
+                            style={[styles.input, { flex: 1 }]}
+                            placeholder="Position"
+                            placeholderTextColor={Colors.silver}
+                            keyboardType="numeric"
+                            value={lessonForm.position}
+                            onChangeText={(value) => setLessonForm(current => ({ ...current, position: value }))}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.primaryBtn, submittingLesson && styles.disabledBtn]}
+                          disabled={submittingLesson}
+                          onPress={addLesson}
+                        >
+                          {editingLessonId ? <Pencil size={16} color={Colors.white} /> : <Plus size={16} color={Colors.white} />}
+                          <Text style={styles.primaryBtnText}>
+                            {submittingLesson ? (editingLessonId ? 'Updating...' : 'Adding...') : (editingLessonId ? 'Update Lesson' : 'Add Lesson')}
+                          </Text>
+                        </TouchableOpacity>
+                        
+                        {editingLessonId && (
+                          <TouchableOpacity
+                            style={[styles.secondaryBtn, { marginTop: 8, borderColor: Colors.silver }]}
+                            onPress={cancelEditLesson}
+                          >
+                            <Text style={[styles.secondaryBtnText, { color: Colors.silver }]}>Cancel Edit</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <TouchableOpacity
-                        style={[styles.primaryBtn, { marginTop: 12 }, submittingLesson && styles.disabledBtn]}
-                        disabled={submittingLesson}
-                        onPress={addLesson}
-                      >
-                        <Plus size={16} color={Colors.white} />
-                        <Text style={styles.primaryBtnText}>
-                          {submittingLesson ? 'Adding...' : 'Add Lesson'}
-                        </Text>
-                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.readOnlyBanner}>
@@ -974,19 +1084,27 @@ export default function AdminCoursesScreen() {
                       selectedCourse.videos
                         .slice()
                         .sort((a, b) => a.position - b.position)
-                        .map((lesson) => (
-                          <View key={lesson.id} style={styles.lessonCard}>
+                        .map((video) => (
+                          <View key={video.id} style={styles.lessonCard}>
                             <View style={styles.lessonTextWrap}>
-                              <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                              <Text style={styles.lessonMeta}>Position {lesson.position + 1}</Text>
+                              <Text style={styles.lessonTitle}>{video.title}</Text>
+                              <Text style={styles.lessonMeta}>Position {video.position + 1}</Text>
                             </View>
                             {selectedCourseIsManual ? (
-                              <TouchableOpacity
-                                onPress={() => deleteLesson(selectedCourse.youtube_playlist_id, lesson.id)}
-                                style={styles.iconBtn}
-                              >
-                                <Trash2 size={18} color={Colors.danger} />
-                              </TouchableOpacity>
+                              <View style={styles.row}>
+                                <TouchableOpacity
+                                  onPress={() => editLesson(video)}
+                                  style={styles.iconBtn}
+                                >
+                                  <Pencil size={18} color={Colors.brandBlue} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => deleteLesson(selectedCourse.youtube_playlist_id, video.id)}
+                                  style={styles.iconBtn}
+                                >
+                                  <Trash2 size={18} color={Colors.danger} />
+                                </TouchableOpacity>
+                              </View>
                             ) : null}
                           </View>
                         ))

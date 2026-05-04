@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy import String, Text, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -10,11 +10,11 @@ class Video(Base):
     __tablename__ = "videos"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    youtube_video_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    youtube_video_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     youtube_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     playlist_id: Mapped[str] = mapped_column(String(36), ForeignKey("playlists.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
-    thumbnail: Mapped[str] = mapped_column(String(500), nullable=True)
+    thumbnail: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration: Mapped[int] = mapped_column(Integer, default=0)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
 import { getCurrentUserId } from '../constants/Auth';
@@ -33,15 +34,62 @@ export default function DashboardScreen() {
 
   const [popularCourses, setPopularCourses] = useState([]);
   const [continuePaths, setContinuePaths] = useState([]);
+  const [allEnrolledPaths, setAllEnrolledPaths] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    loadCache();
+  }, []);
+
+  const loadCache = async () => {
+    try {
+      const [courses, cont, enrolled] = await Promise.all([
+        AsyncStorage.getItem('dashboard_courses'),
+        AsyncStorage.getItem('dashboard_continue'),
+        AsyncStorage.getItem('dashboard_all_enrolled')
+      ]);
+
+      if (courses) setPopularCourses(JSON.parse(courses));
+      if (cont) setContinuePaths(JSON.parse(cont));
+      if (enrolled) setAllEnrolledPaths(JSON.parse(enrolled));
+      
+      // If we have cache, stop showing loading spinner so UI is instant
+      if (courses) setLoading(false);
+    } catch (err) {
+      console.error('Cache load failed:', err);
+    }
+  };
+
+  useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchData();
+      if (!searchQuery) fetchData();
     });
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, searchQuery]);
+
+  useEffect(() => {
+    // Sync activeTab with searchQuery
+    const matchingTab = tabs.find(t => t.toLowerCase() === searchQuery.trim().toLowerCase());
+    if (matchingTab) {
+      setActiveTab(matchingTab);
+    } else if (!searchQuery.trim()) {
+      setActiveTab('All Courses');
+    } else {
+      setActiveTab('All Courses'); // Default to All if typing something else
+    }
+
+    if (!searchQuery.trim()) {
+      fetchData();
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(() => {
+      searchCourses(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const renderStars = (rating) => {
     return (
@@ -59,15 +107,65 @@ export default function DashboardScreen() {
     );
   };
 
+  const searchCourses = async (query) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URLS.PLAYLIST_SERVICE}/playlist/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      const items = data.items || [];
+      
+      let formatted = items.map(course => ({
+        id: String(course.youtube_playlist_id || course.id),
+        title: course.title,
+        category: course.author_name || "Development",
+        rating: course.rating || 5.0,
+        students: course.total_views || 0,
+        description: course.description || "Master the core concepts of this course.",
+        img: course.thumbnail_url || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop",
+        total_score: course.total_score
+      }));
+
+      // Use cached allEnrolledPaths to map progress instantly
+      if (allEnrolledPaths.length > 0) {
+        formatted = formatted.map(course => {
+          const match = allEnrolledPaths.find(p => 
+            p.title === course.title || 
+            String(p.path_id) === course.id || 
+            (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id))
+          );
+          return match ? { ...course, progress: match.progress } : course;
+        });
+      }
+      
+      setPopularCourses(formatted);
+    } catch (err) {
+      console.error('Search failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       const userId = await getCurrentUserId();
-      // Fetch courses
-      const courseRes = await fetch(`${API_URLS.PLAYLIST_SERVICE}/playlist/all`);
+      
+      // Parallel Fetch: Courses and Enrolled Paths at the same time
+      const [courseRes, pathRes] = await Promise.all([
+        fetch(`${API_URLS.PLAYLIST_SERVICE}/playlist/all`),
+        userId ? fetch(`${API_URLS.PATH_SERVICE}/users/${userId}/enrolled-paths`) : Promise.resolve(null)
+      ]);
+
       const courseData = await courseRes.json();
+      const pathData = pathRes ? await pathRes.json() : [];
+      
       const items = courseData.items || [];
       
+      if (Array.isArray(pathData)) {
+        setAllEnrolledPaths(pathData);
+        setContinuePaths(pathData.filter(p => (p.progress || 0) < 100));
+      }
+
       let formatted = [];
       if (Array.isArray(items) && items.length > 0) {
         formatted = items.map(course => ({
@@ -77,7 +175,7 @@ export default function DashboardScreen() {
           rating: course.rating || 5.0,
           students: course.total_views || 0,
           description: course.description || "Master the core concepts of this path.",
-          img: course.thumbnail_url || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+          img: course.thumbnail || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
         }));
       } else {
         formatted = [{
@@ -85,26 +183,24 @@ export default function DashboardScreen() {
         }];
       }
 
-      // Fetch continue paths and map progress
-      if (userId) {
-        const pathRes = await fetch(`${API_URLS.PATH_SERVICE}/users/${userId}/enrolled-paths`);
-        const pathData = await pathRes.json();
-        if (Array.isArray(pathData)) {
-          // Only show paths that are NOT 100% complete in "Continue Learning"
-          setContinuePaths(pathData.filter(p => (p.progress || 0) < 100));
-          
-          formatted = formatted.map(course => {
-            // Find a path that contains this course or is this course
-            const match = pathData.find(p => 
-              p.title === course.title || 
-              String(p.path_id) === course.id || 
-              (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id))
-            );
-            return match ? { ...course, progress: match.progress } : course;
-          });
-        }
+      // Map progress from parallel pathData
+      if (Array.isArray(pathData) && pathData.length > 0) {
+        formatted = formatted.map(course => {
+          const match = pathData.find(p => 
+            p.title === course.title || 
+            String(p.path_id) === course.id || 
+            (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id))
+          );
+          return match ? { ...course, progress: match.progress } : course;
+        });
       }
+      
       setPopularCourses(formatted);
+
+      // Persist to disk for instant load next time
+      AsyncStorage.setItem('dashboard_courses', JSON.stringify(formatted));
+      AsyncStorage.setItem('dashboard_continue', JSON.stringify(pathData.filter(p => (p.progress || 0) < 100)));
+      AsyncStorage.setItem('dashboard_all_enrolled', JSON.stringify(pathData));
     } catch (err) {
       console.error('Dashboard Fetch failed:', err);
     } finally {
@@ -178,7 +274,14 @@ export default function DashboardScreen() {
                 <TouchableOpacity 
                   key={tab} 
                   style={[styles.tag, activeTab === tab && styles.activeTag]}
-                  onPress={() => setActiveTab(tab)}
+                  onPress={() => {
+                    setActiveTab(tab);
+                    if (tab === 'All Courses') {
+                      setSearchQuery('');
+                    } else {
+                      setSearchQuery(tab);
+                    }
+                  }}
                 >
                   <Text style={[styles.tagText, activeTab === tab && styles.activeTagText]}>{tab}</Text>
                 </TouchableOpacity>
@@ -197,7 +300,6 @@ export default function DashboardScreen() {
                 <ActivityIndicator size="large" color={Colors.primaryDark} />
               ) : (
                 popularCourses
-                  .filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map(course => (
                   <TouchableOpacity 
                     key={course.id} 

@@ -1,7 +1,8 @@
-from typing import Dict, List, Optional, Tuple
-import logging
 import re
 import uuid
+import math
+import logging
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -38,10 +39,10 @@ class ContentService:
             author_name=payload.author_name,
         )
 
-        for lesson in payload.lessons:
+        for lesson in (payload.lessons or []):
             self._add_manual_lesson(playlist, lesson)
 
-        for res in payload.resources:
+        for res in (payload.resources or []):
             self.repo.add_resource(playlist.id, res.title, res.url, res.resource_type)
 
         return self.repo.get_playlist_by_youtube_id(playlist.youtube_playlist_id) or playlist
@@ -192,19 +193,31 @@ class ContentService:
         self, query: str, offset: int = 0, limit: int = 20
     ) -> Tuple[List[dict], int]:
         playlists = self.repo.search_playlists(query)
-        scored_results = [self._build_search_result(query, playlist) for playlist in playlists]
-        scored_results.sort(
-            key=lambda item: (
-                -item["relevance_score"],
-                item["title"].lower(),
-                item["youtube_playlist_id"],
-            )
-        )
+        if not playlists:
+            return [], 0
+
+        # Calculate normalization factors from results
+        max_views = max((p.total_views for p in playlists), default=0) or 1
+        max_rating = max((p.rating for p in playlists), default=0.0) or 1.0
+
+        scored_results = [
+            self._build_search_result(query, playlist, max_views, max_rating) 
+            for playlist in playlists
+        ]
+        
+        scored_results.sort(key=lambda item: item["total_score"], reverse=True)
 
         total = len(scored_results)
         return scored_results[offset : offset + limit], total
 
-    def _build_search_result(self, query: str, playlist: Playlist) -> dict:
+    def _normalize_score(self, value: float, max_value: float) -> float:
+        if max_value <= 0:
+            return 0.0
+        return min(value / max_value, 1.0)
+
+    def _build_search_result(
+        self, query: str, playlist: Playlist, max_views: int, max_rating: float
+    ) -> dict:
         query_lower = query.strip().lower()
         tokens = [token for token in re.split(r"\s+", query_lower) if token]
         title = playlist.title.lower()
@@ -212,54 +225,52 @@ class ContentService:
         video_titles = [video.title.lower() for video in playlist.videos]
 
         matched_fields: list[str] = []
-        score = 0.0
+        text_relevance = 0.0
 
         def mark(field: str) -> None:
             if field not in matched_fields:
                 matched_fields.append(field)
 
-        if query_lower and query_lower in title:
-            score += 100.0
-            mark("title")
-            if title.startswith(query_lower):
-                score += 20.0
-
-        if query_lower and query_lower in description:
-            score += 45.0
-            mark("description")
-
-        if query_lower and any(query_lower in video_title for video_title in video_titles):
-            score += 35.0
-            mark("video_title")
-
-        title_hits = 0
-        description_hits = 0
-        video_hits = 0
-
-        for token in tokens:
-            if token in title:
-                title_hits += 1
-                score += 14.0
+        # 1. Text Relevance Scoring (0.0 to 1.0)
+        if query_lower:
+            if title == query_lower:
+                text_relevance = 1.0
                 mark("title")
-                if title.startswith(token):
-                    score += 4.0
-            if token in description:
-                description_hits += 1
-                score += 7.0
+            elif title.startswith(query_lower):
+                text_relevance = 0.9
+                mark("title")
+            elif query_lower in title:
+                text_relevance = 0.8
+                mark("title")
+            elif query_lower in description:
+                text_relevance = 0.5
                 mark("description")
-            if any(token in video_title for video_title in video_titles):
-                video_hits += 1
-                score += 10.0
+            elif any(query_lower in v_title for v_title in video_titles):
+                text_relevance = 0.4
                 mark("video_title")
 
-        if tokens and title_hits == len(tokens):
-            score += 15.0
-        if tokens and description_hits == len(tokens):
-            score += 8.0
-        if tokens and video_hits == len(tokens):
-            score += 10.0
+        # Boost score with token matches if no full match yet
+        if text_relevance < 0.8 and tokens:
+            token_score = 0.0
+            for token in tokens:
+                if token in title:
+                    token_score += 0.2
+                    mark("title")
+                if token in description:
+                    token_score += 0.1
+                    mark("description")
+            text_relevance = min(text_relevance + token_score, 0.8)
 
-        score += min(len(video_titles), 10) * 0.5
+        # 2. Quality Scoring (0.0 to 1.0)
+        # Normalize views using log1p to handle large ranges
+        norm_views = self._normalize_score(math.log1p(playlist.total_views), math.log1p(max_views))
+        norm_rating = self._normalize_score(playlist.rating, max_rating)
+        
+        quality_score = (0.6 * norm_rating) + (0.4 * norm_views)
+
+        # 3. Final Combined Score
+        # 60% text match weight, 40% quality/popularity weight
+        total_score = (0.6 * text_relevance) + (0.4 * quality_score)
 
         return {
             "id": playlist.id,
@@ -272,7 +283,11 @@ class ContentService:
             "author_name": playlist.author_name,
             "last_synced_at": playlist.last_synced_at,
             "videos": playlist.videos,
-            "relevance_score": round(score, 2),
+            "total_views": playlist.total_views,
+            "rating": playlist.rating,
+            "relevance_score": round(text_relevance, 2),
+            "quality_score": round(quality_score, 2),
+            "total_score": round(total_score, 4),
             "matched_fields": matched_fields,
         }
 
@@ -282,9 +297,8 @@ class ContentService:
     def _ensure_video_available(
         self, youtube_video_id: str, current_playlist_id: Optional[str] = None
     ) -> None:
-        existing_video = self.repo.get_video_by_youtube_id(youtube_video_id)
-        if existing_video and existing_video.playlist_id != current_playlist_id:
-            raise ValueError(f"Video '{youtube_video_id}' is already assigned to another course.")
+        # Check removed to allow adding the same video in different courses
+        pass
 
     def _resolve_manual_position(self, playlist: Playlist, requested_position: Optional[int]) -> int:
         existing_videos = self.repo.get_videos_by_playlist(playlist.id)

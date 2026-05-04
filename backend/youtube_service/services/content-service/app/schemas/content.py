@@ -8,9 +8,9 @@ class VideoResponse(BaseModel):
     youtube_video_id: str
     youtube_url: Optional[str] = None
     title: str
-    thumbnail: Optional[str]
-    duration: int
-    position: int
+    thumbnail: Optional[str] = None
+    duration: int = 0
+    position: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -34,7 +34,7 @@ class PlaylistResponse(BaseModel):
     youtube_playlist_id: str
     is_manual: bool = False
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     outcomes: List[str] = Field(default_factory=list)
     thumbnail: Optional[str] = None
     author_name: Optional[str] = None
@@ -61,8 +61,8 @@ class VideoMetadataResponse(BaseModel):
 class ManualLessonCreate(BaseModel):
     youtube_url: str = Field(..., min_length=3, max_length=500)
     title: str = Field(..., min_length=1, max_length=500)
-    duration: int = Field(..., ge=0, description="Duration in seconds")
-    thumbnail: Optional[str] = Field(default=None, max_length=500)
+    duration: int = Field(default=0, ge=0, description="Duration in seconds")
+    thumbnail: Optional[str] = Field(default=None)
     position: Optional[int] = Field(default=None, ge=0)
 
 
@@ -73,20 +73,20 @@ class ManualLessonUpdate(BaseModel):
 
 
 class ManualCourseCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=500)
-    description: Optional[str] = None
-    outcomes: List[str] = Field(default_factory=list)
-    thumbnail: Optional[str] = Field(default=None, max_length=500)
-    author_name: Optional[str] = Field(default=None, max_length=255)
-    lessons: List[ManualLessonCreate] = Field(default_factory=list)
-    resources: List[ResourceCreate] = Field(default_factory=list)
+    title: str = Field(default="")
+    description: Optional[str] = Field(default="")
+    outcomes: Optional[List[str]] = Field(default_factory=list)
+    thumbnail: Optional[str] = Field(default="")
+    author_name: Optional[str] = Field(default="", max_length=255)
+    lessons: Optional[List[ManualLessonCreate]] = Field(default_factory=list)
+    resources: Optional[List[ResourceCreate]] = Field(default_factory=list)
 
 
 class ManualCourseUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=500)
     description: Optional[str] = None
     outcomes: Optional[List[str]] = None
-    thumbnail: Optional[str] = Field(default=None, max_length=500)
+    thumbnail: Optional[str] = Field(default=None)
     author_name: Optional[str] = Field(default=None, max_length=255)
     resources: Optional[List[ResourceCreate]] = None
 

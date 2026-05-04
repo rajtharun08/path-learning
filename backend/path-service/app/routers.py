@@ -759,7 +759,15 @@ async def get_path(
             for item, course in zip(items, course_details, strict=False)
         ],
     )
-
+@router.delete("/paths/{path_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_path(
+    path_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+    _: dict[str, object] = Depends(_require_admin_token),
+) -> None:
+    path = await _get_learning_path_or_404(session, path_id)
+    await session.delete(path)
+    await session.commit()
 
 @router.get("/courses/{playlist_id}", response_model=CourseDetailResponse)
 async def get_course(

@@ -18,7 +18,7 @@ class Playlist(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     outcomes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    thumbnail: Mapped[str] = mapped_column(String(500), nullable=True)
+    thumbnail: Mapped[str] = mapped_column(Text, nullable=True)
     author_name: Mapped[str] = mapped_column(String(255), nullable=True)
     last_synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

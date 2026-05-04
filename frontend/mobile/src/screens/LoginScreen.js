@@ -102,11 +102,6 @@ export default function LoginScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {/* Logo/Branding Section */}
             <View style={styles.headerSection}>
-              <View style={styles.logoContainer}>
-                <View style={styles.logoCircle}>
-                  <Text style={styles.logoLetter}>L</Text>
-                </View>
-              </View>
               <Text style={styles.title}>Luminous</Text>
               <Text style={styles.subtitle}>Ignite your potential through learning</Text>
             </View>

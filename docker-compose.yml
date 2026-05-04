@@ -1,0 +1,212 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────
+  # Separate Databases (Restored)
+  # ─────────────────────────────────────────────
+  user-db:
+    image: postgres:15-alpine
+    container_name: user-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Deepak@2005"
+      POSTGRES_DB: user_db
+    volumes:
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - luminous-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  content-db:
+    image: postgres:15-alpine
+    container_name: content-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Deepak@2005"
+      POSTGRES_DB: content_db
+    volumes:
+      - content_db_data:/var/lib/postgresql/data
+    networks:
+      - luminous-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  progress-db:
+    image: postgres:15-alpine
+    container_name: progress-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Deepak@2005"
+      POSTGRES_DB: progress_db
+    volumes:
+      - progress_db_data:/var/lib/postgresql/data
+    networks:
+      - luminous-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  analytics-db:
+    image: postgres:15-alpine
+    container_name: analytics-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Deepak@2005"
+      POSTGRES_DB: analytics_db
+    volumes:
+      - analytics_db_data:/var/lib/postgresql/data
+    networks:
+      - luminous-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  path-db:
+    image: postgres:15-alpine
+    container_name: path-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "Deepak@2005"
+      POSTGRES_DB: path_service_db
+    volumes:
+      - path_db_data:/var/lib/postgresql/data
+    networks:
+      - luminous-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────
+  # Backend Microservices
+  # ─────────────────────────────────────────────
+  user-service:
+    build: ./backend/youtube_service/services/user-service
+    container_name: user-service
+    environment:
+      DATABASE_URL: postgresql://postgres:Deepak%402005@user-db:5432/user_db
+    ports:
+      - "8001:8001"
+    depends_on:
+      user-db:
+        condition: service_healthy
+    networks:
+      - luminous-net
+
+  content-service:
+    build: ./backend/youtube_service/services/content-service
+    container_name: content-service
+    environment:
+      DATABASE_URL: postgresql://postgres:Deepak%402005@content-db:5432/content_db
+    ports:
+      - "8002:8002"
+    depends_on:
+      content-db:
+        condition: service_healthy
+    networks:
+      - luminous-net
+
+  progress-service:
+    build: ./backend/youtube_service/services/progress-service
+    container_name: progress-service
+    environment:
+      DATABASE_URL: postgresql://postgres:Deepak%402005@progress-db:5432/progress_db
+      CONTENT_SERVICE_URL: http://content-service:8002
+    ports:
+      - "8003:8003"
+    depends_on:
+      progress-db:
+        condition: service_healthy
+      content-service:
+        condition: service_started
+    networks:
+      - luminous-net
+
+  analytics-service:
+    build: ./backend/youtube_service/services/analytics-service
+    container_name: analytics-service
+    environment:
+      DATABASE_URL: postgresql://postgres:Deepak%402005@analytics-db:5432/analytics_db
+    ports:
+      - "8004:8004"
+    depends_on:
+      analytics-db:
+        condition: service_healthy
+    networks:
+      - luminous-net
+
+  recommendation-service:
+    build: ./backend/youtube_service/services/recommendation-service
+    container_name: recommendation-service
+    environment:
+      PROGRESS_SERVICE_URL: http://progress-service:8003
+      CONTENT_SERVICE_URL: http://content-service:8002
+      ANALYTICS_SERVICE_URL: http://analytics-service:8004
+    ports:
+      - "8005:8005"
+    depends_on:
+      - progress-service
+      - content-service
+      - analytics-service
+    networks:
+      - luminous-net
+
+  path-service:
+    build: ./backend/path-service
+    container_name: path-service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:Deepak%402005@path-db:5432/path_service_db
+      CONTENT_SERVICE_BASE_URL: http://content-service:8002
+      PROGRESS_SERVICE_BASE_URL: http://progress-service:8003
+      ANALYTICS_SERVICE_BASE_URL: http://analytics-service:8004
+      ADMIN_JWT_SECRET_KEY: local-dev-secret
+    ports:
+      - "8006:8006"
+    depends_on:
+      path-db:
+        condition: service_healthy
+    networks:
+      - luminous-net
+
+  api-gateway:
+    build: ./backend/youtube_service/services/api-gateway
+    container_name: api-gateway
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      CONTENT_SERVICE_URL: http://content-service:8002
+      PROGRESS_SERVICE_URL: http://progress-service:8003
+      ANALYTICS_SERVICE_URL: http://analytics-service:8004
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:8005
+    ports:
+      - "8000:8000"
+    depends_on:
+      - user-service
+      - content-service
+      - progress-service
+      - analytics-service
+      - recommendation-service
+    networks:
+      - luminous-net
+
+volumes:
+  user_db_data:
+  content_db_data:
+  progress_db_data:
+  analytics_db_data:
+  path_db_data:
+
+networks:
+  luminous-net:
+    driver: bridge

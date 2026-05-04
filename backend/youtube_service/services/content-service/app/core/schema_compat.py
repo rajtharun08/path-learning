@@ -56,3 +56,11 @@ def apply_schema_compatibility_updates(engine: Engine) -> None:
                     "ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 1"
                 )
             )
+
+        # Ensure thumbnail columns are TEXT to support Base64 images
+        connection.execute(text("ALTER TABLE playlists ALTER COLUMN thumbnail TYPE TEXT"))
+        connection.execute(text("ALTER TABLE videos ALTER COLUMN thumbnail TYPE TEXT"))
+
+        # Allow duplicate videos in different courses by dropping the unique constraint and index
+        connection.execute(text("ALTER TABLE videos DROP CONSTRAINT IF EXISTS videos_youtube_video_id_key"))
+        connection.execute(text("DROP INDEX IF EXISTS ix_videos_youtube_video_id"))
