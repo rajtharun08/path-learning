@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.schemas.progress import ProgressUpdateRequest
+from app.schemas.progress import (
+    CourseDetailResponse, ProgressResponse, ProgressUpdateRequest, ResumeResponse,
+    BookmarkToggleRequest, NoteCreateRequest, NoteResponse, AssessmentStatusResponse
+)
 from app.services.progress_service import ProgressService
 
 
@@ -48,3 +51,9 @@ class ProgressController:
                 detail=f"Playlist '{playlist_id}' not found.",
             )
         return result
+
+    def get_assessment(self, playlist_id: str, user_id: str) -> AssessmentStatusResponse:
+        return self.service.get_assessment_status(user_id, playlist_id)
+
+    def complete_assessment(self, playlist_id: str, user_id: str, score: float) -> AssessmentStatusResponse:
+        return self.service.complete_assessment(user_id, playlist_id, score)

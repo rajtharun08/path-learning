@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.pagination import PaginatedResponse, PaginationParams
-from app.schemas.user import UserCreateRequest, UserResponse
+from app.schemas.user import LoginRequest, SignupRequest, UserCreateRequest, UserResponse
 from app.services.user_service import UserService
 
 
@@ -16,6 +16,21 @@ class UserController:
             return self.service.register_user(payload)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    def signup_user(self, payload: SignupRequest):
+        try:
+            return self.service.signup_user(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    def login_user(self, payload: LoginRequest):
+        user = self.service.authenticate_user(payload.email, payload.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password.",
+            )
+        return user
 
     def get_user(self, user_id: str):
         user = self.service.get_user_by_id(user_id)

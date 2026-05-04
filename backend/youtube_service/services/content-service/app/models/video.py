@@ -11,6 +11,7 @@ class Video(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     youtube_video_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    youtube_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     playlist_id: Mapped[str] = mapped_column(String(36), ForeignKey("playlists.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     thumbnail: Mapped[str] = mapped_column(String(500), nullable=True)

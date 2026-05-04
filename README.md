@@ -1,499 +1,198 @@
-# YouTube Learning Platform with Path Service
+# Hexaware Luminous — Learning Platform
 
-A comprehensive microservices ecosystem that transforms YouTube content into a structured learning environment, featuring automated syncing, progress persistence, intelligent recommendations, and structured learning paths.
+A full-stack corporate learning platform built for **Hexaware Technologies**. The platform enables administrators to curate structured learning paths from custom-built video courses and learners to enroll, track their progress, and earn completions — accessible from both **web and mobile (iOS/Android)** via Expo React Native.
 
-## Overview
+---
 
-This platform consists of three primary components:
-1. **YouTube Learning Platform** - Core microservices ecosystem (5 services + API Gateway)
-2. **Path Service** - Advanced microservice for creating and managing structured learning paths
-3. **Client Application** - Modern Mobile (React Native) frontend located in `frontend/mobile`
+## Architecture Overview
 
-The Path Service integrates with the YouTube Learning Platform by consuming the Content Service and Progress Service to enrich learning paths with metadata and progress tracking.
-
-## Architecture
-
-```mermaid
-graph TD
-    subgraph "YouTube Learning Platform"
-        APIGateway[API Gateway<br/>Port 8000] --> UserService[User Service<br/>Port 8001]
-        APIGateway --> ContentService[Content Service<br/>Port 8002]
-        APIGateway --> ProgressService[Progress Service<br/>Port 8003]
-        APIGateway --> AnalyticsService[Analytics Service<br/>Port 8004]
-        APIGateway --> RecommendService[Recommend Service<br/>Port 8005]
-        
-        UserService --> UserDB[(User DB)]
-        ContentService --> ContentDB[(Content DB)]
-        ProgressService --> ProgressDB[(Progress DB)]
-        AnalyticsService --> AnalyticsDB[(Analytics DB)]
-        RecommendService --> RecommendDB[(Recommend DB)]
-    end
-    
-    subgraph "Path Service"
-        PathService[Path Service<br/>Port 8006] --> PathDB[(Path DB)]
-    end
-    
-    PathService -->|HTTP Requests| ContentService
-    PathService -->|HTTP Requests| ProgressService
-    
-    style APIGateway fill:#f9f,stroke:#333
-    style PathService fill:#bbf,stroke:#333
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Frontend (Expo / React Native)         │
+│           Runs on Web (localhost:8081) + Mobile          │
+└──────────────────────┬──────────────────────────────────┘
+                       │ REST API
+         ┌─────────────┼──────────────────┐
+         │             │                  │
+    ┌────▼────┐  ┌─────▼──────┐  ┌───────▼──────┐
+    │  User   │  │  Content   │  │     Path     │
+    │ Service │  │  Service   │  │   Service    │
+    │ :8001   │  │   :8002    │  │    :8006     │
+    └─────────┘  └────────────┘  └──────────────┘
+                       │
+         ┌─────────────┼──────────────────┐
+         │             │                  │
+    ┌────▼────┐  ┌─────▼──────┐  ┌───────▼───────────┐
+    │Progress │  │ Analytics  │  │  Recommendation   │
+    │ Service │  │  Service   │  │     Service       │
+    │  :8003  │  │   :8004    │  │    (internal)     │
+    └─────────┘  └────────────┘  └───────────────────┘
 ```
 
-### Service Details
+### Microservices
 
 | Service | Port | Description |
-|---------|------|-------------|
-| API Gateway | 8000 | Unified entry point routing to all microservices |
-| User Service | 8001 | Manages learner identity profiles |
-| Content Service | 8002 | Integrates with YouTube API to fetch and cache playlists/videos |
-| Progress Service | 8003 | Tracks watch-time, resume points, and course completion |
-| Analytics Service | 8004 | Logs background interaction events |
-| Recommend Service | 8005 | Provides intelligent video recommendations |
-| Path Service | 8006 | Creates and manages structured learning paths |
+|---|---|---|
+| **User Service** | `8001` | Learner registration, login, JWT auth |
+| **Content Service** | `8002` | Manual course & lesson management |
+| **Progress Service** | `8003` | Per-video watch progress, course completion |
+| **Analytics Service** | `8004` | Player events, aggregated analytics |
+| **Path Service** | `8006` | Learning paths, enrollments, ratings |
 
-## Features
-
-### YouTube Learning Platform
-- Automatic synchronization of YouTube content (playlists, videos)
-- User management and authentication
-- Progress tracking with resume functionality and higher precision analytics
-- **Advanced Lesson Interaction**: Integrated note-taking and video bookmarking
-- **Granular Completion Logic**: Intelligent progress calculation based on watch-time percentage, not just binary status
-- Intelligent recommendation engine based on viewing patterns
-
-### Path Service
-- Creation and management of learning paths (ordered collections of playlists/courses)
-- Each path item is treated as a course with detailed lesson-level progress tracking
-- **Smarter Path Progress**: Real-time average completion tracking across multiple courses in a path
-- **Ultra-Fast Loading**: Consolidated endpoints for fetching Path detail + Enrollment + Progress in a single network roundtrip
-- **Premium UX**: Professional **Skeleton Loaders** and shimmer animations for instantaneous perceived performance
-- Live average completion rate computation from enrolled users
-- Ranked search functionality across paths
-- User enrollment and tracking for learning paths
-- Special handling for final lessons: returns "Take Assessment" as next action instead of "Next Lesson"
-
-### Client Application (Mobile)
-- **Hexaware Luminous Design**: Premium, sleek aesthetic with dark mode and vibrant accents.
-- **Native Experience**: Seamless learning journey on iOS and Android via React Native.
-- **Dynamic Interactions**: Real-time progress bars, video bookmarks, and timestamped notes.
-- **Optimized Performance**: Shimmer effects and skeleton loaders for zero-latency perception.
-
-## Data Models
-
-### Path Service Database Schema
-
-```mermaid
-erDiagram
-    LEARNING_PATHS {
-        uuid path_id PK
-        title varchar
-        description text
-        editor_name varchar
-        int total_views
-        float average_completion_rate
-        float rating
-    }
-    PATH_ITEMS {
-        int id PK
-        uuid path_id FK
-        varchar playlist_id
-        int sequence_order
-    }
-    PATH_ENROLLMENTS {
-        int id PK
-        uuid user_id
-        uuid path_id FK
-        timestamp enrolled_at
-    }
-    LEARNING_HISTORY {
-        int id PK
-        uuid user_id
-        uuid path_id FK
-        varchar event_type
-        float progress_percentage
-        timestamp created_at
-    }
-    
-    LEARNING_PATHS ||..o{ PATH_ITEMS : contains
-    LEARNING_PATHS ||..o{ PATH_ENROLLMENTS : has
-    LEARNING_PATHS ||..o{ LEARNING_HISTORY : logs
-```
-
-### YouTube Platform Database Schema (per service)
-
-Each service maintains its own database following the database-per-service pattern:
-- User Service: User profiles and authentication data
-- Content Service: Cached YouTube playlist and video metadata
-- Progress Service: User progress tracking for videos and courses
-- Analytics Service: Interaction events and platform metrics
-- Recommend Service: Recommendation cache and learned patterns
-
-## API Reference
-
-### Response Examples
-
-#### Course Card (in path list)
-```json
-{
-  "playlist_id": "playlist-fastapi-basics",
-  "title": "FastAPI Basics",
-  "description": "Learn FastAPI from scratch",
-  "thumbnail_url": "https://example.com/thumbnail.jpg",
-  "total_lessons": 12,
-  "completed_lessons": 5,
-  "completion_percentage": 41.7,
-  "current_lesson": {
-    "lesson_id": "lesson-6",
-    "title": "Path Operations",
-    "sequence_order": 6
-  },
-  "next_action": "Next Lesson",
-  "is_completed": false
-}
-```
-
-#### Course Detail Screen
-```json
-{
-  "playlist_id": "playlist-fastapi-basics",
-  "title": "FastAPI Basics",
-  "description": "Learn FastAPI from scratch",
-  "thumbnail_url": "https://example.com/thumbnail.jpg",
-  "total_lessons": 12,
-  "completed_lessons": 5,
-  "completion_percentage": 41.7,
-  "current_lesson": {
-    "lesson_id": "lesson-6",
-    "title": "Path Operations",
-    "sequence_order": 6,
-    "video_id": "video-123",
-    "duration": "15:30"
-  },
-  "next_lesson": {
-    "lesson_id": "lesson-7",
-    "title": "Query Parameters",
-    "sequence_order": 7,
-    "video_id": "video-124",
-    "duration": "12:45"
-  },
-  "lessons": [
-    {
-      "lesson_id": "lesson-1",
-      "title": "Introduction",
-      "sequence_order": 1,
-      "video_id": "video-118",
-      "is_completed": true
-    },
-    {
-      "lesson_id": "lesson-2",
-      "title": "Setup",
-      "sequence_order": 2,
-      "video_id": "video-119",
-      "is_completed": true
-    }
-    // ... more lessons
-  ],
-  "next_action": "Next Lesson"
-}
-```
-
-#### Final Lesson (assessment CTA)
-```json
-{
-  "playlist_id": "playlist-fastapi-basics",
-  "title": "FastAPI Basics",
-  "description": "Learn FastAPI from scratch",
-  "thumbnail_url": "https://example.com/thumbnail.jpg",
-  "total_lessons": 12,
-  "completed_lessons": 11,
-  "completion_percentage": 91.7,
-  "current_lesson": {
-    "lesson_id": "lesson-12",
-    "title": "Deployment and Testing",
-    "sequence_order": 12,
-    "video_id": "video-129",
-    "duration": "18:20"
-  },
-  "next_lesson": null,
-  "lessons": [
-    // ... all lessons with completion status
-  ],
-  "next_action": "Take Assessment",
-  "is_completed": false
-}
-```
-
-### Path Service Endpoints
-
-#### Health Check
-```
-GET /health
-```
-Returns service health status.
-
-#### Create Learning Path
-```
-POST /paths
-```
-Creates a new learning path.
-
-**Request Body:**
-```json
-{
-  "title": "Backend Engineering Roadmap",
-  "description": "A structured path for mastering backend development.",
-  "editor_name": "Platform Editorial Team",
-  "rating": 4.7
-}
-```
-
-#### Add Items to Path
-```
-POST /paths/{path_id}/items
-```
-Adds playlist items to a learning path.
-
-**Request Body:**
-```json
-{
-  "playlist_ids": [
-    "playlist-fastapi-basics",
-    "playlist-async-python"
-  ]
-}
-```
-
-#### Get Learning Path
-```
-GET /paths/{path_id}
-```
-Retrieves a learning path with enriched metadata and progress information. Each path item is returned as a course with lesson-level progress, completion state, and next action (including "Take Assessment" for final lessons).
-
-#### Enroll User
-```
-POST /paths/{path_id}/enroll
-```
-Enrolls a user in a learning path.
-
-**Request Body:**
-```json
-{
-  "user_id": "5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859"
-}
-```
-
-#### Get User Progress
-```
-GET /paths/{path_id}/progress?user_id={id}
-```
-Returns progress details for a user in a specific learning path.
-
-#### Search Paths
-```
-GET /paths/search?q={keyword}
-```
-Searches learning paths by title and description with relevance ranking.
-
-#### Get Top Paths
-```
-GET /paths/top?limit=10
-```
-Returns high-quality paths ranked by completion, ratings, and views.
-
-#### Get Course Detail
-```
-GET /courses/{playlist_id}
-```
-Returns a full course detail payload for a specific playlist, including lesson-level metadata and progress information.
-
-#### Get Enrolled Paths (Dashboard)
-```
-GET /users/{user_id}/enrolled-paths
-```
-Returns a list of paths the user has started, including their real-time progress percentages, specifically optimized for the "Continue Learning" dashboard section.
-
-#### Get Learning History
-```
-GET /paths/{path_id}/history?user_id={id}
-```
-Returns the audit log of progress updates and events.
-
-### YouTube Platform Endpoints (via API Gateway)
-
-All YouTube platform endpoints are accessible through the API Gateway at `http://localhost:8000`.
-
-#### User Module (`/users`)
-- `POST /users` - Create new user
-- `GET /users` - List all users
-- `GET /users/{user_id}` - Get user profile
-
-#### Content Module (`/playlist`, `/video`)
-- `GET /playlist/{playlist_id}` - Import and get playlist details
-- `GET /playlist/all` - List all imported playlists
-- `GET /video/metadata/{video_id}` - Get video metadata with embed code
-- `GET /video/next/{video_id}` - Get next video in sequence
-
-#### Progress Module (`/video/progress`, `/course`)
-- `POST /video/progress` - Record video progress
-- `GET /video/resume/{video_id}?user_id={id}` - Get resume point
-- `GET /course/{playlist_id}/progress?user_id={id}` - Get course progress
-- `GET /course/{playlist_id}/completion?user_id={id}` - Check course completion
-- `GET /course/{playlist_id}/detail` - Get lesson-level course detail (current lesson, next lesson, assessment CTA)
-
-#### Analytics Module (`/analytics`)
-- `GET /analytics/dropoff/{video_id}` - Get drop-off points
-- `GET /analytics/popular?limit=10` - Get popular content
-
-#### Recommend Module (`/recommend`)
-- `GET /recommend/{playlist_id}?user_id={id}` - Get video recommendation
-
-## Local Development
-
-### Prerequisites
-- Docker and Docker Compose (for YouTube Platform)
-- Python 3.8+ (for Path Service)
-- PostgreSQL database
-- YouTube Data API v3 Key (for YouTube Platform)
-
-### YouTube Platform Setup
-
-1. Obtain a YouTube Data API v3 Key from Google Cloud Console
-2. Copy `.env.example` to `.env` in the youtube_service directory
-3. Add your API key to the `.env` file:
-   ```
-   YOUTUBE_API_KEY=your_actual_api_key_here
-   ```
-4. Launch the platform:
-   ```bash
-   cd backend/youtube_service
-   docker-compose up --build -d
-   ```
-5. Access API documentation at: `http://localhost:8000/docs`
-
-### Path Service Setup
-
-1. Install dependencies:
-   ```bash
-   cd backend/path-service
-   pip install -r requirements.txt
-   ```
-2. Configure environment variables in `path-service/.env` or set environment variables:
-   ```
-   APP_PORT=8006
-   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/path_service_db
-   CONTENT_SERVICE_BASE_URL=http://127.0.0.1:8002
-   PROGRESS_SERVICE_BASE_URL=http://127.0.0.1:8003
-   HTTP_TIMEOUT_SECONDS=5
-   ```
-3. Initialize the database (tables created automatically at startup)
-4. Run the service:
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8006
-   ```
-5. Access API documentation at: `http://localhost:8006/docs`
-
-### Mobile App Setup
-
-1. Install dependencies:
-   ```bash
-   cd frontend/mobile
-   npm install
-   ```
-2. Start the development server:
-   ```bash
-   npx expo start
-   ```
-3. Open in **Expo Go** on your device.
-
-### Environment Variables
-
-#### YouTube Platform (`youtube_service/.env`)
-```
-YOUTUBE_API_KEY=your_youtube_api_key_here
-```
-
-#### Path Service (`path-service/.env` or environment)
-```
-APP_PORT=8006
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/path_service_db
-CONTENT_SERVICE_BASE_URL=http://127.0.0.1:8002
-PROGRESS_SERVICE_BASE_URL=http://127.0.0.1:8003
-HTTP_TIMEOUT_SECONDS=5
-```
-
-## Deployment Considerations
-
-### For Production Use
-1. **Database Migrations**: Implement Alembic migrations for schema versioning
-2. **Logging**: Add structured logging with appropriate log levels
-3. **Monitoring**: Implement metrics collection and distributed tracing
-4. **Resilience**: Add retry mechanisms and circuit breakers for service calls
-5. **Security**: Implement authentication and authorization for path management
-6. **Scaling**: Configure horizontal pod autoscaling for Kubernetes deployments
-7. **Load Balancing**: Use ingress controllers or service meshes for traffic management
-
-### Database Per Service Pattern
-Each service maintains its own database to ensure loose coupling:
-- Independent scaling and deployment
-- Technology flexibility per service
-- Failure isolation
-- Team autonomy
-
-Communication between services occurs through well-defined HTTP APIs.
-
-## Operational Notes
-
-### Path Service
-- Tables are created automatically at application startup
-- Uses a shared async `httpx.AsyncClient` for efficient HTTP requests
-- Service gracefully handles downstream service failures (Content/Progress)
-- For local testing without YouTube API, manually seed Content Service database
-
-### YouTube Platform
-- Implements cache-first pattern for YouTube data
-- Services communicate via internal Docker network
-- Only API Gateway port (8000) is exposed externally
-- Internal service communication uses Docker hostname resolution
-
-### Client Application
-- **Mobile Framework**: React Native with Expo
-- **Styling**: Native StyleSheet
-- **UI Standards**: Hexaware Luminous Design System
-- **Icons**: Lucide React Native
+---
 
 ## Project Structure
+
 ```
 path-learning/
-├── backend/                  # All backend services
-│   ├── youtube-service/      # YouTube Learning Platform (5 microservices)
-│   │   ├── services/         # Individual microservices
-│   │   ├── diagrams/         # Architecture and ERD diagrams
-│   │   ├── docker-compose.yml# Container orchestration
-│   │   └── README.md         # Detailed platform documentation
-│   └── path-service/         # Path Service microservice
-│       ├── app/              # Application source code
-│       ├── README.md         # Service documentation
-│       ├── main.py           # Application entry point
-│       └── requirements.txt  # Python dependencies
-├── frontend/                 # Client applications
-│   └── mobile/               # React Native / Expo Mobile Application
-│       ├── src/              # Mobile source code
-│       └── README.md         # Mobile documentation
-└── README.md                 # This file
+├── backend/
+│   ├── path-service/            # Learning path & enrollment management
+│   └── youtube_service/
+│       └── services/
+│           ├── content-service/ # Course & lesson CRUD (manual)
+│           ├── progress-service/# Watch progress tracking
+│           ├── analytics-service/# Player event tracking
+│           ├── user-service/    # Auth & user management
+│           ├── api-gateway/     # (Optional) unified routing
+│           └── recommendation-service/
+├── frontend/
+│   └── mobile/                  # Expo React Native app (web + mobile)
+├── start_all.bat                # One-click backend launcher (Windows)
+├── content_db.sql               # Content service DB schema
+├── path_service_db.sql          # Path service DB schema
+├── progress_db.sql              # Progress service DB schema
+└── analytics_db.sql             # Analytics service DB schema
 ```
+
+---
+
+## Prerequisites
+
+- **Python 3.12+** with a shared virtual environment (`venv/`) at the repo root
+- **Node.js 18+** and **npm**
+- **PostgreSQL 15+** with four separate databases:
+  - `content_db`
+  - `path_service_db`
+  - `progress_db`
+  - `analytics_db`
+- **Expo CLI** (`npm install -g expo-cli`)
+
+---
+
+## Quick Start
+
+### 1. Set up Python virtual environment
+
+```bash
+# From the repo root
+python -m venv venv
+venv\Scripts\activate          # Windows
+pip install -r requirements.txt
+```
+
+### 2. Create PostgreSQL databases
+
+```sql
+CREATE DATABASE content_db;
+CREATE DATABASE path_service_db;
+CREATE DATABASE progress_db;
+CREATE DATABASE analytics_db;
+```
+
+Run the `.sql` files to populate the schemas:
+
+```bash
+psql -U postgres -d content_db        -f content_db.sql
+psql -U postgres -d path_service_db   -f path_service_db.sql
+psql -U postgres -d progress_db       -f progress_db.sql
+psql -U postgres -d analytics_db      -f analytics_db.sql
+```
+
+### 3. Configure environment variables
+
+Copy the example env files and fill in your values:
+
+```bash
+cp backend\path-service\.env.example         backend\path-service\.env
+cp backend\youtube_service\.env.example      backend\youtube_service\.env
+```
+
+See each service's own README for the required variables.
+
+### 4. Start all backend services
+
+```bash
+# Windows — launches all 5 services in separate terminal windows
+start_all.bat
+```
+
+Or start services individually (see each service's README).
+
+### 5. Start the frontend
+
+```bash
+cd frontend\mobile
+npm install
+npx expo start --web      # Web browser at localhost:8081
+npx expo start            # Expo Go QR for mobile
+```
+
+---
+
+## Key Features
+
+- **Curated Learning Paths** — Admins group multiple courses into structured, ordered paths
+- **Manual Course Management** — No YouTube API required; courses are created and managed entirely through the Admin Dashboard
+- **Enrollment & Progress Tracking** — Users enroll in paths and track completion per-course and per-video
+- **Star Ratings** — Users rate paths; average ratings are calculated dynamically
+- **Cross-Platform** — Single Expo codebase runs on iOS, Android, and Web
+- **JWT Auth** — Role-based access (student / staff / admin) secured by JWT
+
+---
+
+## Admin Dashboard
+
+The Admin Dashboard is accessible via the **Login** screen using `admin` or `staff` credentials. Admins can:
+
+- Create, edit, and delete **courses** with custom lessons and resources
+- Build and manage **learning paths** by selecting and ordering courses
+- View enrolled student counts and path ratings
+
+---
+
+## API Documentation
+
+Each service exposes interactive Swagger docs at its `/docs` endpoint:
+
+| Service | Docs URL |
+|---|---|
+| User Service | http://localhost:8001/docs |
+| Content Service | http://localhost:8002/docs |
+| Progress Service | http://localhost:8003/docs |
+| Analytics Service | http://localhost:8004/docs |
+| Path Service | http://localhost:8006/docs |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React Native (Expo SDK 55), React 19 |
+| Navigation | React Navigation v6 (Stack + Bottom Tabs) |
+| Styling | StyleSheet (Vanilla RN), expo-linear-gradient |
+| Backend | FastAPI, Python 3.12 |
+| ORM | SQLAlchemy 2.0 (async for path-service) |
+| Database | PostgreSQL 15 |
+| Auth | JWT (PyJWT / python-jose) |
+| Rate Limiting | slowapi |
+| HTTP Client | httpx (async) |
+
+---
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a pull request
-
-## License
-
-This project is proprietary and confidential. All rights reserved.
-
----
-*Documentation last updated: 2026-04-21*
+1. Branch from `main`
+2. Follow the existing service patterns (FastAPI router → controller → service → repository)
+3. Keep each microservice fully self-contained with its own database
+4. Do **not** share database connections across services

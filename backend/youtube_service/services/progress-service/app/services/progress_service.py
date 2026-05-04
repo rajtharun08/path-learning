@@ -9,6 +9,7 @@ from app.schemas.progress import (
     CourseProgressResponse,
     LessonProgressResponse,
     ResumeResponse,
+    AssessmentStatusResponse,
 )
 from app.services.content_client import (
     get_video_duration,
@@ -57,11 +58,16 @@ class ProgressService:
         progress_records = self.repo.get_user_progress_for_videos(user_id, video_ids)
         completed = sum(1 for r in progress_records if r.completed)
         total = len(video_ids)
+        pct = round((completed / total) * 100, 2) if total > 0 else 0.0
+        
+        assessment = self.repo.get_assessment(user_id, playlist_id)
+        assessment_done = bool(assessment and assessment.is_completed)
+
         return CourseProgressResponse(
             playlist_id=playlist_id, user_id=user_id,
             total_videos=total, completed_videos=completed,
             remaining_videos=total - completed,
-            progress_percent=round((completed / total) * 100, 2) if total > 0 else 0.0,
+            progress_percent=pct,
         )
 
     def get_course_completion(self, playlist_id: str, user_id: str) -> Optional[CourseCompletionResponse]:
@@ -77,12 +83,19 @@ class ProgressService:
              return CourseCompletionResponse(playlist_id=playlist_id, user_id=user_id, completion_percentage=0.0, course_completed=False)
         
         completed_count = sum(1 for r in progress_records if r.completed)
-        # For now, let's stick to (completed / total) but ensure it's returned correctly
         pct = round((completed_count / total_videos) * 100, 2)
         
+        assessment = self.repo.get_assessment(user_id, playlist_id)
+        assessment_done = bool(assessment and assessment.is_completed)
+        
+        # Course is only 100% complete if lessons are done AND assessment is done
+        is_fully_done = pct >= 90.0 and assessment_done
+
         return CourseCompletionResponse(
             playlist_id=playlist_id, user_id=user_id,
-            completion_percentage=pct, course_completed=pct >= 90.0,
+            completion_percentage=pct, 
+            course_completed=is_fully_done,
+            assessment_completed=assessment_done
         )
 
     def get_course_detail(self, playlist_id: str, user_id: str) -> Optional[CourseDetailResponse]:
@@ -182,6 +195,23 @@ class ProgressService:
         if thumbnail is None and lessons:
             thumbnail = lessons[0].thumbnail
 
+        assessment = self.repo.get_assessment(user_id, playlist_id)
+        assessment_done = bool(assessment and assessment.is_completed)
+        
+        # Override course_completed: must have watched lessons AND passed assessment
+        course_completed = progress_percent >= 90.0 and assessment_done
+
+        # Adjust next action
+        if progress_percent >= 90.0 and not assessment_done:
+            next_action_type = "take_assessment"
+            next_action_label = "Take Assessment"
+        elif course_completed:
+            next_action_type = "completed"
+            next_action_label = "Course Completed"
+        else:
+            next_action_type = "next_lesson"
+            next_action_label = "Next Lesson"
+
         return CourseDetailResponse(
             playlist_id=playlist_id,
             user_id=user_id,
@@ -193,9 +223,32 @@ class ProgressService:
             remaining_videos=remaining_videos,
             progress_percent=progress_percent,
             course_completed=course_completed,
+            assessment_completed=assessment_done,
             next_action_type=next_action_type,
             next_action_label=next_action_label,
             current_lesson=current_lesson,
             next_lesson=next_lesson,
             lessons=lessons,
+        )
+
+    def get_assessment_status(self, user_id: str, playlist_id: str) -> AssessmentStatusResponse:
+        assessment = self.repo.get_assessment(user_id, playlist_id)
+        if not assessment:
+            return AssessmentStatusResponse(
+                user_id=user_id, playlist_id=playlist_id, is_completed=False, score=0.0
+            )
+        return AssessmentStatusResponse(
+            user_id=user_id, playlist_id=playlist_id,
+            is_completed=assessment.is_completed, score=assessment.score
+        )
+
+    def complete_assessment(self, user_id: str, playlist_id: str, score: float) -> AssessmentStatusResponse:
+        assessment = self.repo.get_assessment(user_id, playlist_id)
+        # Check if they actually finished lessons first? 
+        # (Optional business logic, keeping it simple for now)
+        
+        assessment = self.repo.complete_assessment(user_id, playlist_id, score)
+        return AssessmentStatusResponse(
+            user_id=user_id, playlist_id=playlist_id,
+            is_completed=assessment.is_completed, score=assessment.score
         )

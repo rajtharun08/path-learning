@@ -62,6 +62,7 @@ class CourseCompletionResponse(BaseModel):
     user_id: str
     completion_percentage: float
     course_completed: bool
+    assessment_completed: bool = False
 
 
 class LessonProgressResponse(BaseModel):
@@ -88,8 +89,16 @@ class CourseDetailResponse(BaseModel):
     remaining_videos: int
     progress_percent: float
     course_completed: bool
+    assessment_completed: bool = False
     next_action_type: str
     next_action_label: str
     current_lesson: LessonProgressResponse | None = None
     next_lesson: LessonProgressResponse | None = None
     lessons: list[LessonProgressResponse] = Field(default_factory=list)
+
+
+class AssessmentStatusResponse(BaseModel):
+    playlist_id: str
+    user_id: str
+    is_completed: bool
+    score: float = 0.0

@@ -11,8 +11,8 @@ class UserRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, payload: UserCreateRequest) -> User:
-        user = User(email=payload.email)
+    def create(self, payload: UserCreateRequest, password_hash: str = "", role: str = "student") -> User:
+        user = User(email=payload.email, password_hash=password_hash, role=role)
         self.db.add(user)
         try:
             self.db.commit()

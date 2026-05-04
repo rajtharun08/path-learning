@@ -2,8 +2,10 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/user_db"
+    database_url: str = "postgresql://postgres:Tharun%4008@localhost:5432/user_db"
     service_port: int = 8001
+    auth_jwt_secret_key: str = "local-dev-secret"
+    auth_jwt_algorithm: str = "HS256"
     rate_limit_per_minute: int = 100
     page_size_default: int = 20
     page_size_max: int = 100

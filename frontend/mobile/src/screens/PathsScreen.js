@@ -14,14 +14,32 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star, ChevronRight, Layers } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../theme/Colors';
-import { API_URLS, USER_ID } from '../constants/Config';
+import { API_URLS } from '../constants/Config';
+import { getCurrentUserId } from '../constants/Auth';
 
 export default function PathsScreen() {
   const navigation = useNavigation();
   const [paths, setPaths] = useState([]);
   const [continuePaths, setContinuePaths] = useState([]);
+  const [allEnrolledPaths, setAllEnrolledPaths] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    for (let i = 0; i < 5; i++) {
+      stars.push(
+        <Star 
+          key={i} 
+          size={12} 
+          fill={i < fullStars ? Colors.canary : 'transparent'} 
+          color={i < fullStars ? Colors.canary : Colors.silver} 
+        />
+      );
+    }
+    return stars;
+  };
 
   useEffect(() => {
     fetchEnrolledPaths();
@@ -29,10 +47,16 @@ export default function PathsScreen() {
 
   const fetchEnrolledPaths = async () => {
     try {
-      const res = await fetch(`${API_URLS.PATH_SERVICE}/users/${USER_ID}/enrolled-paths?started_only=true`);
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        setContinuePaths([]);
+        return;
+      }
+      const res = await fetch(`${API_URLS.PATH_SERVICE}/users/${userId}/enrolled-paths`);
       const data = await res.json();
       if (Array.isArray(data)) {
-        setContinuePaths(data);
+        setAllEnrolledPaths(data);
+        setContinuePaths(data.filter(p => (p.progress || 0) < 100));
       }
     } catch (err) {
       console.error('Error fetching enrolled paths:', err);
@@ -54,9 +78,9 @@ export default function PathsScreen() {
               id: path.path_id,
               title: path.title,
               desc: path.description || "Master modern web development with React, TypeScript, and responsive design patterns.",
-              rating: path.rating || 4.5,
-              duration: "45hr 30min",
-              enrollments: path.total_views || "1,234"
+              rating: path.rating || 5.0,
+              duration: "Flexible",
+              enrollments: path.total_views || 0
             }));
             setPaths(formatted);
           } else {
@@ -137,42 +161,50 @@ export default function PathsScreen() {
           {loading ? (
             <ActivityIndicator size="large" color={Colors.primaryDark} />
           ) : (
-            paths.map(path => (
-              <TouchableOpacity 
-                key={path.id} 
-                style={styles.pathCard} 
-                onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
-              >
-                <View style={styles.pathIconWrapper}>
-                  <Layers size={22} color={Colors.brandBlue} />
-                </View>
-                
-                <View style={styles.pathInfo}>
-                  <Text style={styles.pathTitle} numberOfLines={1}>{path.title}</Text>
-                  
-                  <View style={styles.ratingRow}>
-                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                    <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                    <Text style={styles.ratingText}> {path.rating}</Text>
+            paths.map(path => {
+              const enrolled = allEnrolledPaths.find(p => p.path_id === path.id);
+              const isCompleted = enrolled && enrolled.progress >= 100;
+              
+              return (
+                <TouchableOpacity 
+                  key={path.id} 
+                  style={[styles.pathCard, isCompleted && styles.completedPathCard]} 
+                  onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
+                >
+                  <View style={styles.pathIconWrapper}>
+                    <Layers size={22} color={isCompleted ? "#10B981" : Colors.brandBlue} />
                   </View>
                   
-                  <Text style={styles.pathDesc} numberOfLines={1}>{path.desc}</Text>
-                  
-                  <View style={styles.pathFooter}>
-                    <Text style={styles.metaText}>{path.duration}</Text>
-                    <TouchableOpacity 
-                      style={styles.viewBtn}
-                      onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
-                    >
-                      <Text style={styles.viewBtnText}>View Path</Text>
-                    </TouchableOpacity>
+                  <View style={styles.pathInfo}>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.pathTitle} numberOfLines={1}>{path.title}</Text>
+                      {isCompleted && (
+                        <View style={styles.completedBadge}>
+                          <Text style={styles.completedBadgeText}>COMPLETED</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.ratingRow}>
+                      {renderStars(path.rating)}
+                      <Text style={styles.ratingText}> {path.rating}</Text>
+                    </View>
+                    
+                    <Text style={styles.pathDesc} numberOfLines={1}>{path.desc}</Text>
+                    
+                    <View style={styles.pathFooter}>
+                      <Text style={styles.metaText}>{path.duration}</Text>
+                      <TouchableOpacity 
+                        style={[styles.viewBtn, isCompleted && styles.completedViewBtn]}
+                        onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
+                      >
+                        <Text style={styles.viewBtnText}>{isCompleted ? "Review Path" : "View Path"}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
       </ScrollView>
@@ -204,7 +236,7 @@ const styles = StyleSheet.create({
   },
   webContentWrapper: {
     width: '100%',
-    maxWidth: 800,
+    maxWidth: 820,
     backgroundColor: Colors.white,
     flex: 1,
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',
@@ -414,5 +446,29 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  completedBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  completedBadgeText: {
+    color: '#065F46',
+    fontSize: 9,
+    fontFamily: 'Inter_700Bold',
+  },
+  completedPathCard: {
+    borderColor: '#10B981',
+    backgroundColor: '#F9FAFB',
+  },
+  completedViewBtn: {
+    backgroundColor: '#10B981',
   },
 });

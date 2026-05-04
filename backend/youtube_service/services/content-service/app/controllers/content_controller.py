@@ -3,11 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.core.pagination import PaginatedResponse, PaginationParams
 from app.schemas.content import (
+    ManualCourseCreate,
+    ManualCourseUpdate,
+    ManualLessonCreate,
+    ManualLessonUpdate,
     PlaylistResponse,
     PlaylistSearchResultResponse,
     VideoMetadataResponse,
-    PlaylistCreate,
-    PlaylistUpdate
+    ResourceCreate
 )
 from app.services.content_service import ContentService
 
@@ -26,21 +29,81 @@ class ContentController:
             )
         return playlist
 
-    def create_playlist(self, payload: PlaylistCreate):
-        playlist = self.service.create_custom_playlist(payload)
+
+    def create_manual_course(self, payload: ManualCourseCreate):
+        try:
+            return self.service.create_manual_course(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    def update_manual_course(self, course_id: str, payload: ManualCourseUpdate):
+        playlist = self.service.update_manual_course(course_id, payload)
         if not playlist:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"YouTube playlist '{payload.youtube_playlist_id}' not found or could not be synced.",
+                detail=f"Manual course '{course_id}' not found.",
             )
         return playlist
 
-    def update_playlist(self, playlist_id: str, payload: PlaylistUpdate):
-        playlist = self.service.update_custom_playlist(playlist_id, payload)
+    def delete_manual_course(self, course_id: str):
+        deleted = self.service.delete_manual_course(course_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Manual course '{course_id}' not found.",
+            )
+        return {"deleted": True, "course_id": course_id}
+
+    def record_view(self, course_id: str):
+        recorded = self.service.record_view(course_id)
+        if not recorded:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course '{course_id}' not found.",
+            )
+        return {"recorded": True}
+
+    def rate_course(self, course_id: str, rating: float):
+        playlist = self.service.rate_course(course_id, rating)
         if not playlist:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Playlist '{playlist_id}' not found.",
+                detail=f"Course '{course_id}' not found.",
+            )
+        return playlist
+
+    def add_manual_lesson(self, course_id: str, payload: ManualLessonCreate):
+        try:
+            playlist = self.service.add_manual_lesson(course_id, payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Manual course '{course_id}' not found.",
+            )
+        return playlist
+
+    def update_manual_lesson(self, course_id: str, lesson_id: str, payload: ManualLessonUpdate):
+        try:
+            playlist = self.service.update_manual_lesson(course_id, lesson_id, payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson '{lesson_id}' not found in course '{course_id}'.",
+            )
+        return playlist
+
+    def delete_manual_lesson(self, course_id: str, lesson_id: str):
+        playlist = self.service.delete_manual_lesson(course_id, lesson_id)
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Lesson '{lesson_id}' not found in course '{course_id}'.",
             )
         return playlist
 
@@ -81,3 +144,21 @@ class ContentController:
             page=pagination.page,
             page_size=pagination.page_size,
         )
+
+    def add_resource(self, course_id: str, payload: ResourceCreate):
+        playlist = self.service.add_resource(course_id, payload)
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course '{course_id}' not found.",
+            )
+        return playlist
+
+    def delete_resource(self, course_id: str, resource_id: str):
+        playlist = self.service.delete_resource(course_id, resource_id)
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Course '{course_id}' or resource '{resource_id}' not found.",
+            )
+        return playlist

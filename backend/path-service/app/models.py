@@ -101,3 +101,25 @@ class LearningHistory(Base):
     )
 
     path: Mapped["LearningPath"] = relationship()
+
+
+class PathRating(Base):
+    __tablename__ = "path_ratings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "path_id", name="uq_path_ratings_user_path"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    path_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("learning_paths.path_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

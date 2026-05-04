@@ -6,14 +6,17 @@ import {
   TouchableOpacity, 
   ScrollView, 
   Image, 
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, PlayCircle } from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, PlayCircle, Star } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
-import { API_URLS, USER_ID } from '../constants/Config';
+import { API_URLS } from '../constants/Config';
+import { getCurrentUserId, getScopedStorageKey } from '../constants/Auth';
 
 export default function LearningPathScreen() {
   const navigation = useNavigation();
@@ -22,38 +25,61 @@ export default function LearningPathScreen() {
   
   const [modules, setModules] = useState([]);
   const [pathName, setPathName] = useState("");
+  const [description, setDescription] = useState("");
+  const [enrollmentCount, setEnrollmentCount] = useState(0);
+  const [pathRating, setPathRating] = useState(0);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [progressData, setProgressData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPathData();
-  }, [pathId]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchPathData();
+    });
+    return unsubscribe;
+  }, [navigation, pathId]);
 
   const fetchPathData = async () => {
     try {
       setLoading(true);
+      const userId = await getCurrentUserId();
+      const enrolledPathsKey = await getScopedStorageKey('enrolled_paths');
       // 1. Fetch Path Details
-      const res = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}?user_id=${USER_ID}`);
+      const res = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}${userId ? `?user_id=${userId}` : ''}`);
       if(res.ok) {
-         const data = await res.json();
-         setPathName(data.title || "Frontend Development");
-         if(data.items) {
-           setModules(data.items.map((item, index) => ({
-              title: item.title,
-              duration: item.duration || "2h 30m",
-              status: item.is_completed ? "complete" : (index === 0 ? "playing" : "locked"),
-              id: item.id || item.playlist_id
-           })));
-         }
+          const data = await res.json();
+          setPathName(data.title || "Frontend Development");
+          setDescription(data.description || "");
+          setEnrollmentCount(data.total_views || 0);
+          setPathRating(data.rating || 5.0);
+          
+          // Record view
+          fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/view`, { method: 'POST' }).catch(e => console.log('Path view failed', e));
+ 
+          if(data.items) {
+             const firstIncompleteIndex = data.items.findIndex((item) => !item.course_completed);
+             setModules(data.items.map((item, index) => ({
+                title: item.title,
+                description: item.description || "",
+                thumbnail: item.thumbnail || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=200&auto=format&fit=crop",
+                duration: item.duration || "2h 30m",
+                status: item.course_completed
+                  ? "complete"
+                  : (firstIncompleteIndex === -1 ? "complete" : (index === firstIncompleteIndex ? "playing" : "locked")),
+                id: item.id || item.playlist_id
+             })));
+          }
       }
 
       // 2. Check Enrollment
-      const historyRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/history?user_id=${USER_ID}`);
-      const historyData = await historyRes.json();
-      const enrolledInHistory = Array.isArray(historyData) && historyData.some(ev => ev.event_type === 'enrolled');
+      let enrolledInHistory = false;
+      if (userId) {
+        const historyRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/history?user_id=${userId}`);
+        const historyData = await historyRes.json();
+        enrolledInHistory = Array.isArray(historyData) && historyData.some(ev => ev.event_type === 'enrolled');
+      }
       
-      const stored = await AsyncStorage.getItem('enrolled_paths');
+      const stored = await AsyncStorage.getItem(enrolledPathsKey);
       const storedPaths = stored ? JSON.parse(stored) : [];
       const isLocallyEnrolled = storedPaths.includes(pathId);
       
@@ -62,7 +88,7 @@ export default function LearningPathScreen() {
       
       if(enrolled) {
         // 3. Fetch Progress if Enrolled
-        const progRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/progress?user_id=${USER_ID}`);
+        const progRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/progress?user_id=${userId}`);
         if(progRes.ok) {
            const progData = await progRes.json();
            setProgressData(progData);
@@ -77,23 +103,48 @@ export default function LearningPathScreen() {
 
   const handleEnroll = async () => {
     try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        return;
+      }
+      const enrolledPathsKey = await getScopedStorageKey('enrolled_paths');
       const res = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/enroll`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID })
+        body: JSON.stringify({ user_id: userId })
       });
       if(res.ok || res.status === 409) {
         setIsEnrolled(true);
-        const stored = await AsyncStorage.getItem('enrolled_paths');
+        const stored = await AsyncStorage.getItem(enrolledPathsKey);
         const storedPaths = stored ? JSON.parse(stored) : [];
         if(!storedPaths.includes(pathId)) {
            storedPaths.push(pathId);
-           await AsyncStorage.setItem('enrolled_paths', JSON.stringify(storedPaths));
+           await AsyncStorage.setItem(enrolledPathsKey, JSON.stringify(storedPaths));
         }
         fetchPathData();
       }
     } catch(err) {
        console.error("Failed to enroll", err);
+    }
+  };
+
+  const handleRatePath = async (rating) => {
+    try {
+      const userId = await getCurrentUserId();
+      if (!userId) return;
+
+      const res = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, rating })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPathRating(data.rating);
+      }
+    } catch (err) {
+      console.error("Failed to rate path", err);
     }
   };
 
@@ -106,18 +157,45 @@ export default function LearningPathScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, Platform.OS === 'web' && styles.webContainer]}>
+      <View style={Platform.OS === 'web' ? styles.webContentWrapper : { flex: 1, width: '100%' }}>
+
       <ScrollView style={{ flex: 1, width: '100%' }} stickyHeaderIndices={[0]} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ArrowLeft size={24} color={Colors.navy} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ArrowLeft size={20} color={Colors.silver} />
+              <Text style={{ color: Colors.silver, fontSize: 14, fontFamily: 'Inter_500Medium' }}>Paths Directory</Text>
+              <Text style={{ color: Colors.borderLight2, fontSize: 14 }}>/</Text>
+              <Text style={{ color: Colors.navy, fontSize: 14, fontFamily: 'Inter_600SemiBold' }} numberOfLines={1}>
+                {pathName}
+              </Text>
+            </View>
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{pathName}</Text>
         </View>
 
         <View style={styles.pathHeaderMeta}>
           <Text style={styles.mainTitle}>{pathName}</Text>
-          <Text style={styles.totalDuration}>Total Duration: 45h 30m</Text>
+          <View style={styles.headerRatingRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star 
+                key={star} 
+                size={14} 
+                fill={star <= Math.round(pathRating) ? Colors.canary : 'transparent'} 
+                color={Colors.canary} 
+              />
+            ))}
+            <Text style={styles.ratingTextSmall}>{parseFloat(pathRating).toFixed(1)}</Text>
+          </View>
+          {description ? <Text style={styles.pathDescription}>{description}</Text> : null}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{enrollmentCount}</Text>
+              <Text style={styles.statLabel}> Enrolled Students</Text>
+            </View>
+            <Text style={styles.statDivider}>•</Text>
+            <Text style={styles.statLabel}>{modules.length} Modules</Text>
+          </View>
         </View>
 
         {isEnrolled ? (
@@ -130,12 +208,14 @@ export default function LearningPathScreen() {
             <View style={styles.progressBarLarge}>
                <View style={[styles.progressFillLarge, { width: `${progressData ? progressData.progress_percentage : 0}%` }]} />
             </View>
-            <Text style={styles.encouragementText}>You're making great progress! Keep going to complete this learning path.</Text>
+            <Text style={styles.encouragementText}>
+              {(progressData?.status === 'completed' || (progressData?.progress_percentage || 0) >= 100)
+                ? (progressData?.certification_message || 'Congratulations! You mastered this learning path.')
+                : "You're making great progress! Keep going to complete this learning path."}
+            </Text>
           </View>
         ) : (
           <View style={styles.enrollCard}>
-             <Text style={styles.enrollTitle}>Unlock your future</Text>
-             <Text style={styles.enrollDesc}>Enroll in this learning path to start tracking your curriculum progress and earn your certification.</Text>
              <TouchableOpacity style={styles.enrollBtn} onPress={handleEnroll}>
                <Text style={styles.enrollBtnText}>Enroll in Path</Text>
              </TouchableOpacity>
@@ -153,12 +233,13 @@ export default function LearningPathScreen() {
                 onPress={() => navigation.navigate('CourseDetails', { courseId: mod.id })}
               >
                 <View style={styles.moduleImgWrapper}>
-                  <Image source={{ uri: `https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=200&auto=format&fit=crop` }} style={styles.moduleImg} />
+                  <Image source={{ uri: mod.thumbnail }} style={styles.moduleImg} />
                   {mod.status === 'complete' && <View style={[styles.statusIcon, styles.successIcon]}><CheckCircle2 color="white" size={20} /></View>}
                   {mod.status === 'playing' && <View style={[styles.statusIcon, styles.activeIcon]}><PlayCircle color="white" size={20} /></View>}
                 </View>
                 <View style={styles.moduleInfo}>
-                  <Text style={styles.moduleTitle}>{mod.title}</Text>
+                  <Text style={styles.moduleTitle} numberOfLines={1}>{mod.title}</Text>
+                  {mod.description ? <Text style={styles.moduleDesc} numberOfLines={2}>{mod.description}</Text> : null}
                   {mod.status === 'playing' && isEnrolled && <Text style={styles.playingBadge}>Now Playing</Text>}
                   <View style={styles.moduleMeta}>
                     <Text style={styles.moduleDuration}>{mod.duration}</Text>
@@ -170,12 +251,31 @@ export default function LearningPathScreen() {
             ))}
           </View>
         </View>
+
+        {isEnrolled && (
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingSectionTitle}>Rate this Learning Path</Text>
+            <View style={styles.starRowLarge}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => handleRatePath(star)}>
+                  <Star 
+                    size={32} 
+                    fill={star <= Math.round(pathRating) ? Colors.canary : 'transparent'} 
+                    color={Colors.canary} 
+                    style={{ marginRight: 8 }}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingHelpText}>Your feedback helps us improve the quality of our learning paths.</Text>
+          </View>
+        )}
       </ScrollView>
 
       {isEnrolled && (
         <View style={styles.bottomAction}>
           <TouchableOpacity 
-            style={styles.resumeBtnLarge} 
+            style={[styles.resumeBtnLarge, (progressData?.status === 'completed' || (progressData?.progress_percentage || 0) >= 100) && { backgroundColor: Colors.success }]} 
             onPress={() => {
               if (progressData && progressData.next_up) {
                 navigation.navigate('VideoPlayer', { courseId: progressData.next_up.playlist_id });
@@ -184,12 +284,20 @@ export default function LearningPathScreen() {
               }
             }}
           >
-            <PlayCircle size={20} color="white" style={{ marginRight: 8 }} />
-            <Text style={styles.resumeBtnTextLarge}>Resume Learning</Text>
+            {(progressData?.status === 'completed' || (progressData?.progress_percentage || 0) >= 100) ? (
+              <CheckCircle2 size={20} color="white" style={{ marginRight: 8 }} />
+            ) : (
+              <PlayCircle size={20} color="white" style={{ marginRight: 8 }} />
+            )}
+            <Text style={styles.resumeBtnTextLarge}>
+              {(progressData?.status === 'completed' || (progressData?.progress_percentage || 0) >= 100) ? 'Path Completed' : 'Resume Learning'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
+      </View>
     </SafeAreaView>
+
   );
 }
 
@@ -205,6 +313,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.offWhite,
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+  },
+  webContainer: {
+    backgroundColor: Colors.offWhite,
+  },
+  webContentWrapper: {
+    width: '100%',
+    maxWidth: 820,
+    backgroundColor: Colors.offWhite,
+    flex: 1,
   },
   center: {
     flex: 1,
@@ -232,10 +350,52 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   mainTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  headerRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 4,
+  },
+  ratingTextSmall: {
+    fontSize: 13,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
+    marginLeft: 4,
+  },
+  pathDescription: {
+    fontSize: 15,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.brandBlue,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+  },
+  statDivider: {
+    color: Colors.borderLight2,
+    fontSize: 14,
   },
   totalDuration: {
     fontSize: 14,
@@ -295,7 +455,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     backgroundColor: Colors.white,
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.borderLight,
@@ -383,10 +543,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   moduleTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
     marginBottom: 4,
+  },
+  moduleDesc: {
+    fontSize: 13,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 18,
+    marginBottom: 8,
   },
   playingBadge: {
     fontSize: 10,
@@ -416,6 +583,33 @@ const styles = StyleSheet.create({
   },
   locked: {
     opacity: 0.7,
+  },
+  ratingSection: {
+    padding: 24,
+    margin: 20,
+    marginTop: 0,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    ...luminoShadow,
+    alignItems: 'center',
+  },
+  ratingSectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
+    marginBottom: 12,
+  },
+  starRowLarge: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  ratingHelpText: {
+    fontSize: 12,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
   },
   bottomAction: {
     position: 'absolute',

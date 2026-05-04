@@ -17,7 +17,8 @@ import { ArrowLeft, FileText, CheckCircle2, PlayCircle, Lock, ChevronDown, Check
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
-import { API_URLS, USER_ID } from '../constants/Config';
+import { API_URLS } from '../constants/Config';
+import { getCurrentUserId } from '../constants/Auth';
 
 const { width } = Dimensions.get('window');
 
@@ -38,8 +39,14 @@ export default function VideoPlayerScreen() {
   const [videoNotes, setVideoNotes] = useState([]);
   const [playing, setPlaying] = useState(true);
   const [activeTab, setActiveTab] = useState('Overview');
+  const [resources, setResources] = useState([]);
+  const [nextAction, setNextAction] = useState({ type: 'next_lesson', label: 'Next Lesson' });
 
   const playerRef = useRef();
+  const getLessonByVideoId = useCallback(
+    (videoId) => syllabus.find((lesson) => lesson.id === videoId),
+    [syllabus]
+  );
 
   useEffect(() => {
     fetchCourseData();
@@ -47,7 +54,11 @@ export default function VideoPlayerScreen() {
 
   const fetchCourseData = async () => {
     try {
-      const res = await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}?user_id=${USER_ID}`);
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        return;
+      }
+      const res = await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}?user_id=${userId}`);
       const data = await res.json();
       if(data) {
         if (data.current_lesson) {
@@ -55,6 +66,11 @@ export default function VideoPlayerScreen() {
            setCurrentVideoId(data.current_lesson.youtube_video_id);
         }
         setCourseProgress(data.progress_percent || 0);
+        setResources(data.resources || []);
+        setNextAction({
+            type: data.next_action_type || 'next_lesson',
+            label: data.next_action_label || 'Next Lesson'
+         });
 
         if (data.lessons && data.lessons.length > 0) {
           setSyllabus(data.lessons.map((l, i) => {
@@ -63,6 +79,7 @@ export default function VideoPlayerScreen() {
               id: l.youtube_video_id || `temp-${i}`,
               title: l.title || `Lesson ${i+1}`,
               duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
+              rawDuration: l.duration || 0,
               status: l.completed ? 'complete' : (isPlaying ? 'playing' : 'available'),
               completed: l.completed || false,
               nextId: data.lessons[i + 1]?.youtube_video_id || null
@@ -86,7 +103,11 @@ export default function VideoPlayerScreen() {
   const fetchNotes = async () => {
     if (!currentVideoId) return;
     try {
-      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/notes/${currentVideoId}?user_id=${USER_ID}`);
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        return;
+      }
+      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/notes/${currentVideoId}?user_id=${userId}`);
       const data = await res.json();
       setVideoNotes(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -98,23 +119,63 @@ export default function VideoPlayerScreen() {
     fetchNotes();
   }, [currentVideoId]);
 
-  const sendProgressAnalytics = async (eventType, seconds, completed) => {
+  const sendProgressAnalytics = async (eventType, seconds) => {
     try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        return;
+      }
       await fetch(`${API_URLS.VIDEO_SERVICE}/video/progress`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({
-            user_id: USER_ID,
+            user_id: userId,
             video_id: currentVideoId,
             watched_seconds: Math.floor(seconds),
             event_type: eventType,
-            completed: completed || false
          })
       });
     } catch(err) {
       console.log('Progress tracking error:', err);
     }
   };
+
+  const syncLessonCompletion = useCallback(async (videoId, watchedSeconds = 0) => {
+    if (!videoId) {
+      return false;
+    }
+
+    const lesson = getLessonByVideoId(videoId);
+    const fallbackDuration = Math.floor(lesson?.rawDuration || 0);
+    const completionSeconds = Math.max(Math.floor(watchedSeconds), fallbackDuration);
+
+    try {
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        return false;
+      }
+      await fetch(`${API_URLS.VIDEO_SERVICE}/video/progress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          video_id: videoId,
+          watched_seconds: completionSeconds,
+          event_type: 'complete',
+        }),
+      });
+
+      setSyllabus((prev) =>
+        prev.map((item) =>
+          item.id === videoId ? { ...item, status: 'complete', completed: true } : item
+        )
+      );
+      return true;
+    } catch (err) {
+      console.log('Completion sync error:', err);
+      return false;
+    }
+  }, [getLessonByVideoId]);
 
   useEffect(() => {
     if (syllabus.length > 0) {
@@ -142,7 +203,8 @@ export default function VideoPlayerScreen() {
     if (Platform.OS !== 'web') {
       time = await playerRef.current?.getCurrentTime();
     }
-    await sendProgressAnalytics('complete', time, true);
+    const lesson = getLessonByVideoId(currentVideoId);
+    await syncLessonCompletion(currentVideoId, time || lesson?.rawDuration || 0);
     
     const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
     if (currentIndex !== -1) {
@@ -158,6 +220,7 @@ export default function VideoPlayerScreen() {
             setCurrentLesson(nextLesson.title);
         }
     }
+    await fetchCourseData();
   };
 
   // Poll progress for 40% unlock logic
@@ -175,7 +238,7 @@ export default function VideoPlayerScreen() {
               setLessonUnlocked(true);
             }
             
-            sendProgressAnalytics('progress', cur, false);
+            sendProgressAnalytics('progress', cur);
           } catch (e) {
             console.log("Ref call failed", e);
           }
@@ -187,10 +250,14 @@ export default function VideoPlayerScreen() {
 
   const toggleBookmark = async () => {
     try {
+       const userId = await getCurrentUserId();
+       if (!userId) {
+         return;
+       }
        const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/bookmark`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: USER_ID, video_id: currentVideoId })
+          body: JSON.stringify({ user_id: userId, video_id: currentVideoId })
        });
        const data = await res.json();
        if (data.bookmarked !== undefined) {
@@ -208,10 +275,14 @@ export default function VideoPlayerScreen() {
         ts = await playerRef.current?.getCurrentTime() || 0;
       }
       try {
+          const userId = await getCurrentUserId();
+          if (!userId) {
+            return;
+          }
           await fetch(`${API_URLS.VIDEO_SERVICE}/video/notes`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: USER_ID, video_id: currentVideoId, content: noteText, video_timestamp: Math.floor(ts) })
+              body: JSON.stringify({ user_id: userId, video_id: currentVideoId, content: noteText, video_timestamp: Math.floor(ts) })
           });
           setNoteText('');
           setShowNotesModal(false);
@@ -223,7 +294,11 @@ export default function VideoPlayerScreen() {
 
   const handleResume = async () => {
     try {
-        const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/resume/${currentVideoId}?user_id=${USER_ID}`);
+        const userId = await getCurrentUserId();
+        if (!userId) {
+          return;
+        }
+        const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/resume/${currentVideoId}?user_id=${userId}`);
         const data = await res.json();
         if (data.resume_at_seconds > 0 && Platform.OS !== 'web') {
             playerRef.current?.seekTo(data.resume_at_seconds, true);
@@ -279,14 +354,31 @@ export default function VideoPlayerScreen() {
           
           <View style={styles.courseProgress}>
              <View style={styles.progressCircleContainer}>
-                <View style={styles.progressRing}>
-                   <View style={styles.progressInnerRing}>
-                      <Text style={styles.progressPercentage}>{courseProgress}%</Text>
-                   </View>
-                </View>
+                 <View style={[
+                   styles.progressRing, 
+                   { 
+                     borderColor: Colors.borderLight,
+                     borderTopColor: courseProgress > 0 ? Colors.brandBlue : Colors.borderLight,
+                     borderRightColor: courseProgress >= 25 ? Colors.brandBlue : Colors.borderLight,
+                     borderBottomColor: courseProgress >= 50 ? Colors.brandBlue : Colors.borderLight,
+                     borderLeftColor: courseProgress >= 75 ? Colors.brandBlue : Colors.borderLight,
+                   }
+                 ]}>
+                    <View style={styles.progressInnerRing}>
+                       <Text style={styles.progressPercentage}>{courseProgress}%</Text>
+                    </View>
+                 </View>
                 <View style={styles.progressTextContainer}>
                    <Text style={styles.progressLabel}>Course Progress</Text>
                    <Text style={styles.progressValue}>You've watched {Math.round((courseProgress/100) * syllabus.length)} of {syllabus.length} lessons</Text>
+                   <View style={styles.progressBarTrack}>
+                     <View
+                       style={[
+                         styles.progressBarFill,
+                         { width: `${Math.max(0, Math.min(courseProgress, 100))}%` },
+                       ]}
+                     />
+                   </View>
                 </View>
              </View>
               <TouchableOpacity 
@@ -306,8 +398,9 @@ export default function VideoPlayerScreen() {
               <Text style={[styles.tabText, activeTab === 'Notes' && styles.activeTabText]}>Notes</Text>
               <View style={styles.badge}><Text style={styles.badgeText}>{videoNotes.length}</Text></View>
            </TouchableOpacity>
-           <TouchableOpacity style={styles.tabItem} disabled>
-              <Text style={styles.tabText}>Resources</Text>
+           <TouchableOpacity style={[styles.tabItem, activeTab === 'Resources' && styles.activeTabItem]} onPress={() => setActiveTab('Resources')}>
+              <Text style={[styles.tabText, activeTab === 'Resources' && styles.activeTabText]}>Resources</Text>
+              <View style={styles.badge}><Text style={styles.badgeText}>{resources.length}</Text></View>
            </TouchableOpacity>
         </View>
 
@@ -320,18 +413,6 @@ export default function VideoPlayerScreen() {
               style={[styles.syllabusItem, item.id === currentVideoId && styles.activeSyllabusItem]}
               onPress={async () => {
                 if (item.status !== 'locked') {
-                  const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
-                  const currentItem = syllabus[currentIndex];
-                  
-                  if (currentItem && !currentItem.completed) {
-                     await sendProgressAnalytics('complete', videoStats.current || 0, true);
-                     setSyllabus(prev => prev.map((s, idx) => ({
-                        ...s,
-                        status: idx === currentIndex ? 'complete' : s.status,
-                        completed: idx === currentIndex ? true : s.completed
-                     })));
-                  }
-
                   setCurrentVideoId(item.id);
                   setCurrentLesson(item.title);
                   setLessonUnlocked(false);
@@ -340,9 +421,9 @@ export default function VideoPlayerScreen() {
             >
               <View style={styles.statusIconWrapper}>
                 {item.id === currentVideoId ? (
-                  <View style={styles.activeIconCircle}><Play size={14} color={Colors.brandBlue} fill={Colors.brandBlue} /></View>
+                   <View style={styles.activeIconCircle}><Play size={14} color={Colors.brandBlue} fill={Colors.brandBlue} /></View>
                 ) : item.status === 'complete' ? (
-                  <View style={styles.completedIconCircle}><Text style={styles.circleNumber}>{idx + 1}</Text></View>
+                  <View style={styles.completedIconCircle}><CheckCircle2 size={16} color="#10B981" /></View>
                 ) : item.status === 'locked' ? (
                   <View style={styles.lockedIconCircle}><Lock size={14} color={Colors.silver} /></View>
                 ) : (
@@ -350,31 +431,50 @@ export default function VideoPlayerScreen() {
                 )}
               </View>
               <View style={styles.syllabusInfo}>
-                <Text style={[styles.syllabusTitle, item.id === currentVideoId && {color: Colors.silver}]}>{item.title}</Text>
+                <Text style={[styles.syllabusTitle, item.id === currentVideoId && {color: Colors.brandBlue}]}>{item.title}</Text>
                 <Text style={[styles.syllabusMetaText, item.id === currentVideoId && {color: Colors.brandBlue, fontWeight: '600'}]}>
                    {item.id === currentVideoId ? `${item.duration}  ·  Now Playing` : item.duration}
                 </Text>
               </View>
               <View style={styles.syllabusRightAction}>
                 {item.status === 'complete' && <CheckCircle2 size={20} color="#10B981" />}
-                {item.id === currentVideoId && <AlignLeft size={20} color={Colors.brandBlue} />}
               </View>
             </TouchableOpacity>
           ))}
         </View>
-        ) : (
+        ) : activeTab === 'Notes' ? (
            <View style={styles.syllabusSection}>
               {videoNotes.length > 0 ? (
                  videoNotes.map(n => (
                    <View key={n.id} style={styles.noteItem}>
-                      <Text style={styles.noteTimestamp}>
-                         {Math.floor(n.video_timestamp / 60)}:{String(n.video_timestamp % 60).padStart(2, '0')}
-                      </Text>
-                      <Text style={styles.noteContent}>{n.content}</Text>
+                       <Text style={styles.noteContent}>{n.content}</Text>
                    </View>
                  ))
               ) : (
                  <Text style={styles.progressLabel}>No notes for this lesson yet.</Text>
+              )}
+           </View>
+        ) : (
+           <View style={styles.syllabusSection}>
+              {resources.length > 0 ? (
+                 resources.map(r => (
+                   <TouchableOpacity 
+                     key={r.id} 
+                     style={styles.resourceItem}
+                     onPress={() => Alert.alert('Open Resource', `Opening: ${r.url}`)}
+                   >
+                       <View style={styles.resourceIconWrapper}>
+                          {r.resource_type === 'github' ? <AlignLeft size={20} color={Colors.brandBlue} /> : <FileText size={20} color={Colors.brandBlue} />}
+                       </View>
+                       <View style={styles.resourceInfo}>
+                          <Text style={styles.resourceTitle}>{r.title}</Text>
+                          <Text style={styles.resourceMeta}>{r.resource_type.toUpperCase()}</Text>
+                       </View>
+                       <ChevronDown size={18} color={Colors.silver} style={{transform: [{rotate: '-90deg'}]}} />
+                   </TouchableOpacity>
+                 ))
+              ) : (
+                 <Text style={styles.progressLabel}>No resources available for this course.</Text>
               )}
            </View>
         )}
@@ -386,15 +486,14 @@ export default function VideoPlayerScreen() {
           const currentIndex = syllabus.findIndex(s => s.id === currentVideoId);
           const currentItem = syllabus[currentIndex];
           
-          const uncompletedCount = syllabus.filter(s => !s.completed).length;
-          const isReadyForAssessment = uncompletedCount === 0 || (uncompletedCount === 1 && currentItem && !currentItem.completed);
+          const isReadyForAssessment = syllabus.length > 0 && syllabus.every(s => s.completed);
           
           const isLastIndex = currentIndex === syllabus.length - 1;
-          const needsToLoopBack = isLastIndex && !isReadyForAssessment;
+          const needsToLoopBack = isLastIndex && !isReadyForAssessment && !!currentItem?.completed;
           
-          let btnText = "Next Lesson";
-          if (isReadyForAssessment) {
-             btnText = "Take Assessment";
+          let btnText = nextAction.label;
+          if (currentItem && !currentItem.completed) {
+             btnText = "Mark Lesson Complete";
           } else if (needsToLoopBack) {
              btnText = "Complete Missed Lessons";
           }
@@ -408,17 +507,41 @@ export default function VideoPlayerScreen() {
                 style={[styles.footerBtnPrimary, !canProceed && styles.disabledBtn]}
                 onPress={async () => {
                   if (currentItem && !currentItem.completed) {
-                     await sendProgressAnalytics('complete', videoStats.current || 0, true);
-                     setSyllabus(prev => prev.map((s, idx) => ({
-                        ...s,
-                        status: idx === currentIndex ? 'complete' : s.status,
-                        completed: idx === currentIndex ? true : s.completed
-                     })));
+                     const completionSeconds = Platform.OS === 'web'
+                       ? (currentItem.rawDuration || 0)
+                       : (videoStats.current || currentItem.rawDuration || 0);
+                     await syncLessonCompletion(currentVideoId, completionSeconds);
+                     await fetchCourseData();
+                     return;
                   }
 
-                  if (isReadyForAssessment) {
-                    Alert.alert('Coming Soon', 'Take Assessment module coming soon!');
-                  } else if (needsToLoopBack) {
+                   if (isReadyForAssessment || btnText === "Take Assessment") {
+                     Alert.alert(
+                        'Course Assessment',
+                        'You have completed all lessons! Are you ready to take the assessment?',
+                        [
+                           { text: 'Later', style: 'cancel' },
+                           { 
+                             text: 'Start Assessment', 
+                             onPress: async () => {
+                                // Mock assessment: instantly complete it for now
+                                try {
+                                   const userId = await getCurrentUserId();
+                                   const res = await fetch(`${API_URLS.PROGRESS_SERVICE}/course/${courseId}/assessment/complete?user_id=${userId}&score=100`, {
+                                      method: 'POST'
+                                   });
+                                   if (res.ok) {
+                                      Alert.alert('Congratulations!', 'You have passed the assessment and completed the course!');
+                                      fetchCourseData();
+                                   }
+                                } catch (err) {
+                                   console.log('Assessment failed', err);
+                                }
+                             }
+                           }
+                        ]
+                     );
+                   } else if (needsToLoopBack) {
                     const nextTarget = syllabus.find(s => !s.completed && s.id !== currentVideoId) || syllabus[0];
                     setCurrentVideoId(nextTarget.id);
                     setCurrentLesson(nextTarget.title);
@@ -477,9 +600,6 @@ export default function VideoPlayerScreen() {
                 <ScrollView style={{maxHeight: 200}}>
                   {videoNotes.map(n => (
                     <View key={n.id} style={styles.noteItem}>
-                      <Text style={styles.noteTimestamp}>
-                        {Math.floor(n.video_timestamp / 60)}:{String(n.video_timestamp % 60).padStart(2, '0')}
-                      </Text>
                       <Text style={styles.noteContent}>{n.content}</Text>
                     </View>
                   ))}
@@ -513,7 +633,7 @@ const styles = StyleSheet.create({
   },
   webContentWrapper: {
     width: '100%',
-    maxWidth: 800,
+    maxWidth: 820,
     backgroundColor: Colors.offWhite,
     flex: 1,
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',
@@ -592,8 +712,6 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 4,
-    borderColor: Colors.brandBlue,
-    borderLeftColor: Colors.borderLight, // Simulating 75% progress
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -623,6 +741,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.silver,
     fontFamily: 'Inter_400Regular',
+  },
+  progressBarTrack: {
+    marginTop: 8,
+    width: 180,
+    maxWidth: '100%',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: Colors.surface,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: Colors.brandBlue,
   },
   viewCourseChip: {
     backgroundColor: Colors.offWhite,
@@ -906,14 +1038,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.offWhite,
   },
-  noteTimestamp: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.brandBlue,
-    marginBottom: 2,
-  },
   noteContent: {
     fontSize: 14,
     color: Colors.navy,
+  },
+  resourceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  resourceIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(52, 102, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  resourceInfo: {
+    flex: 1,
+  },
+  resourceTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.navy,
+    marginBottom: 2,
+  },
+  resourceMeta: {
+    fontSize: 11,
+    color: Colors.silver,
+    fontFamily: 'Inter_400Regular',
   },
 });

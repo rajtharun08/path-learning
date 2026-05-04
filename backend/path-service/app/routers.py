@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db_session
-from app.models import LearningHistory, LearningPath, PathEnrollment, PathItem
+from app.models import LearningHistory, LearningPath, PathEnrollment, PathItem, PathRating
 from app.schemas import (
     CourseDetailResponse,
     EnrolledPathResponse,
@@ -25,6 +25,7 @@ from app.schemas import (
     PathProgressResponse,
     PathResponse,
     PathWithItemsResponse,
+    RatingCreate,
     SearchResultResponse,
 )
 
@@ -174,10 +175,13 @@ async def _fetch_course_metadata(
         return {
             "title": payload.get("title"),
             "description": payload.get("description"),
+            "outcomes": payload.get("outcomes", []),
             "thumbnail": thumbnail,
             "duration": formatted_duration,
             "total_videos": len(videos),
             "content_status": "available",
+            "author_name": payload.get("author_name"),
+            "resources": payload.get("resources", []),
         }
     except (httpx.HTTPError, ValueError, AttributeError):
         return {
@@ -245,17 +249,20 @@ async def _fetch_course_detail(
             "description": metadata.get("description"),
             "thumbnail": metadata.get("thumbnail"),
             "duration": metadata.get("duration"),
+            "outcomes": metadata.get("outcomes", []),
             "content_status": metadata.get("content_status", "available"),
             "total_videos": len(lessons),
             "completed_videos": 0,
             "remaining_videos": len(lessons),
             "progress_percent": 0.0,
             "course_completed": False,
+            "assessment_completed": False,
             "next_action_type": next_action_type,
             "next_action_label": next_action_label,
             "current_lesson": current_lesson,
             "next_lesson": next_lesson,
             "lessons": lessons,
+            "resources": metadata.get("resources", []),
             "author_name": metadata.get("author_name"),
         }
 
@@ -294,17 +301,20 @@ async def _fetch_course_detail(
         "description": metadata.get("description"),
         "thumbnail": metadata.get("thumbnail"),
         "duration": metadata.get("duration"),
+        "outcomes": metadata.get("outcomes", []),
         "content_status": metadata.get("content_status", "available"),
         "total_videos": progress_payload.get("total_videos", len(lessons) or metadata.get("total_videos", 0)),
         "completed_videos": progress_payload.get("completed_videos", 0),
         "remaining_videos": progress_payload.get("remaining_videos", 0),
         "progress_percent": progress_payload.get("progress_percent", 0.0),
         "course_completed": progress_payload.get("course_completed", False),
+        "assessment_completed": progress_payload.get("assessment_completed", False),
         "next_action_type": progress_payload.get("next_action_type", "next_lesson"),
         "next_action_label": progress_payload.get("next_action_label", "Next Lesson"),
         "current_lesson": progress_payload.get("current_lesson"),
         "next_lesson": progress_payload.get("next_lesson"),
         "lessons": lessons,
+        "resources": metadata.get("resources", []),
     }
 
 
@@ -807,6 +817,44 @@ async def enroll_user(
     return enrollment
 
 
+@router.post("/paths/{path_id}/rate")
+async def rate_path(
+    path_id: uuid.UUID,
+    payload: RatingCreate,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    # 1. Check if path exists
+    path = await _get_learning_path_or_404(session, path_id)
+
+    # 2. Add or update rating
+    stmt = select(PathRating).where(
+        PathRating.path_id == path_id, PathRating.user_id == payload.user_id
+    )
+    result = await session.execute(stmt)
+    existing_rating = result.scalar_one_or_none()
+
+    if existing_rating:
+        existing_rating.rating = payload.rating
+    else:
+        new_rating = PathRating(
+            user_id=payload.user_id, path_id=path_id, rating=payload.rating
+        )
+        session.add(new_rating)
+
+    await session.commit()
+
+    # 3. Calculate new average rating
+    stmt_avg = select(func.avg(PathRating.rating)).where(PathRating.path_id == path_id)
+    result_avg = await session.execute(stmt_avg)
+    avg_rating = result_avg.scalar() or 0.0
+
+    # 4. Update the path's rating field
+    path.rating = float(avg_rating)
+    await session.commit()
+
+    return {"path_id": path_id, "rating": path.rating}
+
+
 async def _calculate_path_progress(
     user_id: uuid.UUID,
     path_id: uuid.UUID,
@@ -830,20 +878,28 @@ async def _calculate_path_progress(
         *[
             client.get(f"{settings.progress_service_base_url}/course/{item.playlist_id}/completion?user_id={user_id}")
             for item in items
-        ]
+        ],
+        return_exceptions=True
     )
+
+    completion_data_list = []
+    for res in completion_results:
+        if isinstance(res, Exception):
+            completion_data_list.append({"completion_percentage": 0.0, "course_completed": False})
+            continue
+        try:
+            res.raise_for_status()
+            completion_data_list.append(res.json())
+        except:
+            completion_data_list.append({"completion_percentage": 0.0, "course_completed": False})
 
     total_pct = 0.0
     completed_courses = 0
-    for res in completion_results:
-        try:
-            data = res.json()
-            pct = data.get("completion_percentage", 0.0)
-            total_pct += pct
-            if data.get("course_completed", False):
-                completed_courses += 1
-        except:
-            pass
+    for data in completion_data_list:
+        pct = data.get("completion_percentage", 0.0)
+        total_pct += pct
+        if data.get("course_completed", False):
+            completed_courses += 1
 
     avg_progress = round(total_pct / total_courses, 2) if total_courses > 0 else 0.0
     remaining_courses = total_courses - completed_courses
@@ -854,7 +910,7 @@ async def _calculate_path_progress(
     )
 
     next_index = next(
-        (index for index, completed in enumerate(completion_results) if not completed),
+        (index for index, data in enumerate(completion_data_list) if not data.get("course_completed", False)),
         None,
     )
 
@@ -873,7 +929,8 @@ async def _calculate_path_progress(
         "remaining_courses": remaining_courses,
         "progress_percentage": avg_progress,
         "status": progress_status,
-        "next_up": next_up
+        "next_up": next_up,
+        "playlist_ids": [item.playlist_id for item in items]
     }
 
 
@@ -925,22 +982,28 @@ async def get_enrolled_paths(
     
     response = []
     for enrollment in enrollments:
-        path = await _get_learning_path_or_404(session, enrollment.path_id)
-        progress_data = await _calculate_path_progress(user_id, enrollment.path_id, session, client)
-        
-        progress_val = float(progress_data["progress_percentage"])
-        if started_only and progress_val <= 0:
-            continue
+        try:
+            path = await _get_learning_path_or_404(session, enrollment.path_id)
+            progress_data = await _calculate_path_progress(user_id, enrollment.path_id, session, client)
+            
+            progress_val = float(progress_data["progress_percentage"])
+            if started_only and progress_val <= 0:
+                continue
 
-        response.append(EnrolledPathResponse(
-            path_id=path.path_id,
-            title=path.title,
-            progress=float(progress_data["progress_percentage"]),
-            status=progress_data["status"],
-            total_courses=progress_data["total_courses"],
-            completed_courses=progress_data["completed_courses"]
-        ))
-        
+            response.append(EnrolledPathResponse(
+                path_id=path.path_id,
+                title=path.title,
+                progress=float(progress_data["progress_percentage"]),
+                status=progress_data["status"],
+                total_courses=progress_data["total_courses"],
+                completed_courses=progress_data["completed_courses"],
+                playlist_ids=progress_data["playlist_ids"]
+            ))
+        except Exception as e:
+            # Skip paths that cause errors instead of crashing the whole list
+            print(f"Error processing enrollment for path {enrollment.path_id}: {str(e)}")
+            continue
+            
     return response
 
 

@@ -15,7 +15,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
-import { API_URLS, USER_ID } from '../constants/Config';
+import { API_URLS } from '../constants/Config';
+import { getCurrentUserId, getScopedStorageKey } from '../constants/Auth';
 
 export default function CourseDetailsScreen() {
   const navigation = useNavigation();
@@ -60,7 +61,8 @@ export default function CourseDetailsScreen() {
 
   const fetchCourseDetails = async () => {
     try {
-      const res = await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}?user_id=${USER_ID}`);
+      const userId = await getCurrentUserId();
+      const res = await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}${userId ? `?user_id=${userId}` : ''}`);
       const data = await res.json();
       if(data && data.title) {
          const hash = generateConsistentHash(courseId);
@@ -71,12 +73,15 @@ export default function CourseDetailsScreen() {
          setCourse({
            title: data.title,
            rating: data.rating || dynamicRating, 
-           students: dynamicStudents,
+           students: (data.total_views || 0) + 1, // Add 1 for the current user viewing
            duration: data.duration || (data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours"),
            desc: data.description || "",
            instructor: instructorName,
            img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
          });
+
+         // Record view on backend
+         fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/view`, { method: 'POST' }).catch(e => console.log('View recording failed', e));
           if (data.lessons) {
             setLessons(data.lessons.map((l, i) => ({
                id: l.youtube_video_id || i,
@@ -102,7 +107,8 @@ export default function CourseDetailsScreen() {
 
   const checkEnrollment = async () => {
     try {
-      const enrolled = await AsyncStorage.getItem('enrolled_courses');
+      const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+      const enrolled = await AsyncStorage.getItem(enrolledCoursesKey);
       const enrolledList = enrolled ? JSON.parse(enrolled) : [];
       if(enrolledList.includes(courseId)) {
         setIsEnrolled(true);
@@ -114,11 +120,15 @@ export default function CourseDetailsScreen() {
 
   const handleCourseEnroll = async () => {
     try {
-      const enrolled = await AsyncStorage.getItem('enrolled_courses');
+      const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+      const enrolled = await AsyncStorage.getItem(enrolledCoursesKey);
       const enrolledList = enrolled ? JSON.parse(enrolled) : [];
       if(!enrolledList.includes(courseId)) {
         enrolledList.push(courseId);
-        await AsyncStorage.setItem('enrolled_courses', JSON.stringify(enrolledList));
+        await AsyncStorage.setItem(enrolledCoursesKey, JSON.stringify(enrolledList));
+        
+        // Trigger a view record on enrollment too to ensure they are counted
+        fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/view`, { method: 'POST' }).catch(e => {});
       }
       setIsEnrolled(true);
     } catch (err) {
@@ -260,7 +270,40 @@ export default function CourseDetailsScreen() {
 
             {activeTab === 'Reviews' && (
               <View style={styles.overview}>
-                <Text style={styles.desc}>4.8 out of 5 stars based on 1,200 reviews</Text>
+                <Text style={styles.subTitle}>Rate this course</Text>
+                <View style={[styles.metaRow, { marginVertical: 10 }]}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity 
+                      key={star} 
+                      onPress={async () => {
+                        try {
+                          const userId = await getCurrentUserId();
+                          const res = await fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/rate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rating: star, user_id: userId })
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setCourse(prev => ({ ...prev, rating: data.rating }));
+                            alert(`You rated this course ${star} stars!`);
+                          }
+                        } catch (e) {
+                          console.log('Rating failed', e);
+                        }
+                      }}
+                    >
+                      <Star 
+                        size={32} 
+                        fill={star <= Math.round(course.rating) ? Colors.canary : 'transparent'} 
+                        color={Colors.canary} 
+                        style={{ marginRight: 8 }}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.desc}>Current Rating: {parseFloat(course.rating).toFixed(1)} / 5.0</Text>
+                <Text style={styles.desc}>Your feedback helps other students find the best content.</Text>
               </View>
             )}
           </View>
@@ -303,7 +346,7 @@ const styles = StyleSheet.create({
   },
   webContentWrapper: {
     width: '100%',
-    maxWidth: 800,
+    maxWidth: 820,
     backgroundColor: Colors.offWhite,
     flex: 1,
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',

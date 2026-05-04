@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.database import Base, engine
+from app.core.schema_compat import apply_schema_compatibility_updates
 from app.middleware.cors import add_cors_middleware
 from app.middleware.exception_handlers import add_exception_handlers
 from app.routers.content_router import limiter, router
@@ -12,6 +13,7 @@ from app.services.scheduler import start_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    apply_schema_compatibility_updates(engine)
     scheduler = start_scheduler()
     yield
     scheduler.shutdown(wait=False)

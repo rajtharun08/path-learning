@@ -1,135 +1,178 @@
-# 📺 YouTube Learning Platform Backend
+# Backend Services — Hexaware Luminous
 
-A production-ready microservices ecosystem that transforms YouTube content into a structured learning environment. Featuring automated syncing, progress persistence, and an intelligent recommendation engine.
+This directory contains all backend microservices for the Hexaware Luminous platform, organised into two groups:
 
----
-
-## 🚀 Quick Start & Setup
-
-To run this backend locally, you will need **Docker** and a **YouTube Data API v3 Key**.
-
-### 1. Get a YouTube API Key
-
-Since this platform automatically syncs course content directly from YouTube, it requires an API key:
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project and enable the **YouTube Data API v3**.
-3. Generate an API Key under **Credentials**.
-
-### 2. Configure Environment Variables
-
-1. Clone this repository.
-2. In the root directory, locate the `.env.example` file.
-3. Copy it and rename the copy to `.env`.
-4. Open the new `.env` file and insert your API key:
-   ```env
-   YOUTUBE_API_KEY=your_actual_api_key_here
-   ```
-
-### 3. Launch with Docker Compose
-
-Run the following command in the root directory. Docker will automatically build the images, spin up 5 isolated PostgreSQL databases, and start the 5 FastAPI microservices along with the API Gateway.
-
-```bash
-docker-compose up --build -d
+```
+backend/
+├── path-service/         # Learning path orchestration (standalone FastAPI)
+└── youtube_service/
+    └── services/
+        ├── content-service/      # Course & lesson management  (:8002)
+        ├── progress-service/     # Watch progress & completion (:8003)
+        ├── analytics-service/    # Player event tracking       (:8004)
+        ├── user-service/         # Auth & learner identities   (:8001)
+        ├── api-gateway/          # Optional unified gateway
+        └── recommendation-service/
 ```
 
-_You can now access the interactive API Documentation at: `http://localhost:8000/docs`_
+---
+
+## Service Map
+
+| Service | Port | Database | Stack |
+|---|---|---|---|
+| User Service | `8001` | `users_db` (or shared) | FastAPI, SQLAlchemy sync, PostgreSQL |
+| Content Service | `8002` | `content_db` | FastAPI, SQLAlchemy sync, PostgreSQL |
+| Progress Service | `8003` | `progress_db` | FastAPI, SQLAlchemy sync, PostgreSQL |
+| Analytics Service | `8004` | `analytics_db` | FastAPI, SQLAlchemy sync, PostgreSQL |
+| Path Service | `8006` | `path_service_db` | FastAPI, SQLAlchemy **async**, PostgreSQL |
 
 ---
 
-## 🏗️ Technical Architecture
+## Shared Setup
 
-![High Level Architecture](diagrams/microservices_architecture_diagram_1772957936232.png)
+All services share the same Python virtual environment at the **repo root**:
 
-The system consists of 5 independent microservices orchestrated via an **API Gateway (Port 8000)**. The Gateway routes all traffic using a proxy pattern so the frontend only needs to speak to a single unified URL (`localhost:8000`).
+```bash
+# From repo root
+python -m venv venv
+venv\Scripts\activate        # Windows
+pip install -r requirements.txt
+```
 
-| Microservice          | Internal Port | Description                                                                                                               |
-| :-------------------- | :------------ | :------------------------------------------------------------------------------------------------------------------------ |
-| **User Service**      | `8001`        | Manages learner identity profiles.                                                                                        |
-| **Content Service**   | `8002`        | Integrates with YouTube API to fetch and cache Playlists/Videos.                                                          |
-| **Progress Service**  | `8003`        | Tracks watch-time, resume points, and course completion.                                                                  |
-| **Analytics Service** | `8004`        | Logs background interaction events (play, pause, seek), tracking drop-offs and platform popularity.                       |
-| **Recommend Service** | `8005`        | Acts as the "brains" of the platform, advising the user what video to watch next based on cross-service data constraints. |
-
----
-
-## 🛠️ Complete Developer API Reference
-
-_(All requests should be made to the API Gateway at `http://localhost:8000`)_
-
-### 👤 User Module (`/users`)
-
-| Method | Endpoint           | JSON Payload / Notes                                                                               |
-| :----- | :----------------- | :------------------------------------------------------------------------------------------------- |
-| `POST` | `/users`           | `{"email": "learner@example.com"}`<br>_Returns a unique user ID required for subsequent requests._ |
-| `GET`  | `/users`           | Returns a paginated list of all registered users.                                                  |
-| `GET`  | `/users/{user_id}` | Returns a single user profile.                                                                     |
-
-### 📚 Content Module (`/playlist`, `/video`)
-
-_Note: This service uses a Cache-First pattern. Hitting a GET endpoint for the first time natively acts as an "Add to database" trigger._
-| Method | Endpoint | JSON Payload / Notes |
-| :--- | :--- | :--- |
-| `GET` | `/playlist/{playlist_id}` | Provide a YouTube Playlist ID. The backend will instantly import all videos to the DB. |
-| `GET` | `/playlist/all` | Returns a paginated list of all imported courses. |
-| `POST`| `/playlist` | `{"youtube_playlist_id": "id", "title": "...", "description": "..."}`<br>Manually create a course record. |
-| `PUT` | `/playlist/{playlist_id}` | Update metadata for an existing course. |
-| `GET` | `/playlist/search?q={query}` | Search for YouTube playlists by query string. Returns matching playlists with metadata. |
-| `GET` | `/video/metadata/{video_id}` | Provide a single YouTube Video ID. Returns the title, duration, and **a ready-to-use HTML iframe embed code**. |
-| `GET` | `/video/next/{video_id}` | Returns the chronological next video in the sequence. |
-
-### 📈 Progress & Tracking Module (`/video/progress`, `/course`)
-
-| Method | Endpoint                                        | JSON Payload / Notes                                                                                                                                                           |
-| :----- | :---------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/video/progress`                               | `{"user_id": "uuid", "video_id": "yt_id", "watched_seconds": 120, "event_type": "pause"}`<br>_This modifies progress AND triggers a background task to the Analytics Service._ |
-| `GET`  | `/video/resume/{video_id}?user_id={id}`         | Returns exactly what second the user left off at (or 0 if completed).                                                                                                          |
-| `GET`  | `/course/{playlist_id}/progress?user_id={id}`   | Returns course-wide stats (e.g. "Completed 3/10 videos").                                                                                                                      |
-| `GET`  | `/course/{playlist_id}/completion?user_id={id}` | Returns an assessment boolean `course_completed: true` if watched > 90%.                                                                                                       |
-| `POST` | `/video/notes`                                  | `{"user_id": "uuid", "video_id": "yt_id", "content": "note text", "video_timestamp": 45}`<br>_Persists a timestamped note for a specific video._                               |
-| `GET`  | `/video/notes/{video_id}?user_id={user_id}`      | Returns all notes for a specific video.                                                                                                                                        |
-| `POST` | `/video/bookmark`                               | `{"user_id": "uuid", "video_id": "yt_id"}`<br>_Toggles the bookmark status for a video._                                                                                       |
-
-### 📊 Analytics Module (`/analytics`)
-
-| Method | Endpoint                        | JSON Payload / Notes                                                                       |
-| :----- | :------------------------------ | :----------------------------------------------------------------------------------------- |
-| `POST` | `/video/event`                  | Record low-level interaction events (play, pause, seek).                                   |
-| `GET`  | `/analytics/dropoff/{video_id}` | Indicates the exact second in the video where the majority of users click "pause" or skip. |
-| `GET`  | `/analytics/popular?limit=10`   | Generates a platform-wide leaderboard based on Play events and Completion rates.           |
-
-### 🤖 Recommendation Module (`/recommend`)
-
-| Method | Endpoint                                | JSON Payload / Notes                                                   |
-| :----- | :-------------------------------------- | :--------------------------------------------------------------------- |
-| `GET`  | `/recommend/{playlist_id}?user_id={id}` | The engine decides your next lesson. Read below for the Logic details. |
+Each service has its own `.env` file (copy from `.env.example`). See individual service READMEs for the required variables.
 
 ---
 
-## 🧠 Business Logic & Database
+## Starting Services
 
-### Database Schema (ERD)
+### One-click (Windows)
 
-The platform embraces true microservice data-isolation ("Database-per-service"). There are no foreign keys shared across databases; relationships are loosely coupled via `user_id` and `video_id` UUID strings.
+Run `start_all.bat` from the repo root — it opens all five services in separate terminal windows.
 
-![Database Schema](diagrams/ERD.png)
+### Manual
 
-### The Recommendation Engine Decision Tree
+```bash
+# User Service
+cd backend/youtube_service/services/user-service
+uvicorn app.main:app --reload --port 8001
 
-Rather than forcing the frontend to figure out what a user should do next, the Recommendation service aggregates data centrally:
+# Content Service
+cd backend/youtube_service/services/content-service
+uvicorn app.main:app --reload --port 8002
 
-1. **Check for Unfinished Videos:** Does the user have a video paused midway? `-> Recommend they resume.`
-2. **Check for Next in Sequence:** Did they just finish Lesson 1? `-> Recommend Lesson 2.`
-3. **Check Global Popularity:** Have they finished the whole course? `-> Ask the Analytics Service for the highest trending platform video and recommend that.`
+# Progress Service
+cd backend/youtube_service/services/progress-service
+uvicorn app.main:app --reload --port 8003
 
-![Logic Flow](diagrams/Recommended%20engine.png)
+# Analytics Service
+cd backend/youtube_service/services/analytics-service
+uvicorn app.main:app --reload --port 8004
+
+# Path Service
+cd backend/path-service
+uvicorn main:app --reload --port 8006
+```
 
 ---
 
-## � Deployment Overview
+## Content Service
 
-![Docker Setup](diagrams/Docker.png)
+**Port:** `8002` | **DB:** `content_db`
 
-The application utilizes Docker-Compose to spin up an internal `bridge` network (`youtube-net`).
-All services are bound to this network and refer to each other natively using hostname resolution (e.g. `http://user-db:5432` or `http://content-service:8002`). The only port exposed to the public host machine is the API Gateway on `:8000`.
+Manages all course content using a **fully manual approach** — no YouTube API key required. Admins create courses, lessons, and resources through the Admin Dashboard.
+
+### Key Endpoints
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `GET` | `/playlist/all` | Public | List all courses (paginated) |
+| `GET` | `/playlist/{id}` | Public | Get a single course with all lessons |
+| `GET` | `/playlist/search?q=` | Public | Full-text course search |
+| `POST` | `/courses` | Staff/Admin | Create a course with lessons |
+| `PUT` | `/courses/{id}` | Staff/Admin | Update course metadata |
+| `DELETE` | `/courses/{id}` | Staff/Admin | Delete a course |
+| `POST` | `/courses/{id}/lessons` | Staff/Admin | Add a lesson |
+| `PUT` | `/courses/{id}/lessons/{lid}` | Staff/Admin | Update a lesson |
+| `DELETE` | `/courses/{id}/lessons/{lid}` | Staff/Admin | Remove a lesson |
+| `POST` | `/courses/{id}/resources` | Staff/Admin | Add a resource link |
+| `POST` | `/courses/{id}/view` | Public | Increment view count |
+| `POST` | `/courses/{id}/rate` | Public | Rate a course (1–5) |
+| `POST` | `/auth/login` | Public | Get admin JWT token |
+| `GET` | `/video/metadata/{video_id}` | Public | Get video + next video metadata |
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | `postgresql://user:pass@localhost:5432/content_db` |
+| `ADMIN_JWT_SECRET_KEY` | Secret for signing/verifying admin tokens |
+| `ADMIN_JWT_ALGORITHM` | Default: `HS256` |
+
+---
+
+## Progress Service
+
+**Port:** `8003` | **DB:** `progress_db`
+
+Tracks per-user, per-video watch progress and calculates whether a course is completed.
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/course/{course_id}/completion?user_id=` | Get completion % and status for a course |
+| `POST` | `/video/{video_id}/progress` | Save watch progress for a video |
+| `GET` | `/video/{video_id}/progress?user_id=` | Get current progress for a video |
+
+---
+
+## Analytics Service
+
+**Port:** `8004` | **DB:** `analytics_db`
+
+Records player events (play, pause, seek, complete) for aggregated reporting.
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/events` | Record a player event |
+| `GET` | `/events/{video_id}` | Get events for a video |
+
+---
+
+## User Service
+
+**Port:** `8001`
+
+Handles learner registration, login, and identity management. Returns a `user_id` (UUID) which is used as the identity key across all other services.
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/register` | Register a new learner |
+| `POST` | `/login` | Authenticate and get user_id |
+| `GET` | `/users/{user_id}` | Get user profile |
+
+---
+
+## Auth Model
+
+- Admin and Staff tokens are issued by the **Content Service** (`POST /auth/login`)
+- Tokens are JWT-signed with `ADMIN_JWT_SECRET_KEY` and carry `role` and `is_admin` claims
+- Protected routes in the Content Service and Path Service validate these tokens via `require_staff_token`
+- Student sessions are identified only by their `user_id` UUID (stored client-side in AsyncStorage)
+
+---
+
+## Swagger Docs
+
+| Service | URL |
+|---|---|
+| User Service | http://localhost:8001/docs |
+| Content Service | http://localhost:8002/docs |
+| Progress Service | http://localhost:8003/docs |
+| Analytics Service | http://localhost:8004/docs |
+| Path Service | http://localhost:8006/docs |

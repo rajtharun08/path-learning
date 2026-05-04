@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.video_progress import VideoProgress
 from app.models.learning_session import LearningSession
 from app.models.video_note import VideoNote
+from app.models.course_assessment import CourseAssessment
 
 
 class ProgressRepository:
@@ -102,3 +103,26 @@ class ProgressRepository:
         self.db.commit()
         self.db.refresh(session)
         return session
+
+    def get_assessment(self, user_id: str, playlist_id: str) -> Optional[CourseAssessment]:
+        return (
+            self.db.query(CourseAssessment)
+            .filter(CourseAssessment.user_id == user_id, CourseAssessment.playlist_id == playlist_id)
+            .first()
+        )
+
+    def complete_assessment(self, user_id: str, playlist_id: str, score: float) -> CourseAssessment:
+        assessment = self.get_assessment(user_id, playlist_id)
+        if assessment:
+            assessment.is_completed = True
+            assessment.score = score
+            assessment.completed_at = datetime.now(timezone.utc)
+        else:
+            assessment = CourseAssessment(
+                user_id=user_id, playlist_id=playlist_id,
+                is_completed=True, score=score
+            )
+            self.db.add(assessment)
+        self.db.commit()
+        self.db.refresh(assessment)
+        return assessment

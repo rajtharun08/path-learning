@@ -18,6 +18,9 @@ start "Analytics Service (8004)" cmd /k "D:\path-learning\venv\Scripts\activate 
 :: 4. Start Path Service (8006) - FIXED PATH
 echo Starting Path Service...
 start "Path Service (8006)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\backend\path-service && uvicorn main:app --reload --port 8006"
+:: 5. user service
+echo Starting User Service...
+start "User Service (8001)" cmd /k "D:\path-learning\venv\Scripts\activate && cd /d D:\path-learning\backend\youtube_service\services\user-service && uvicorn app.main:app --reload --port 8001"
 
 @REM :: 5. Start Frontend
 @REM echo Starting Frontend...

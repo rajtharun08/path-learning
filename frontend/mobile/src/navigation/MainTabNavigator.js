@@ -1,13 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Compass } from 'lucide-react-native';
+import { Home, Compass, ShieldCheck } from 'lucide-react-native';
 import DashboardScreen from '../screens/DashboardScreen';
 import PathsScreen from '../screens/PathsScreen';
+import AdminCoursesScreen from '../screens/AdminCoursesScreen';
+import { getAuthSession } from '../constants/Auth';
 import Colors from '../theme/Colors';
 
 const Tab = createBottomTabNavigator();
 
 export default function MainTabNavigator() {
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSession = async () => {
+      const authSession = await getAuthSession();
+      if (isMounted) {
+        setSession(authSession);
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const isAdminView = ['admin', 'staff'].includes((session?.role || '').toLowerCase());
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -17,6 +40,8 @@ export default function MainTabNavigator() {
             return <Home color={color} size={size} />;
           } else if (route.name === 'Paths') {
             return <Compass color={color} size={size} />;
+          } else if (route.name === 'Admin') {
+            return <ShieldCheck color={color} size={size} />;
           }
         },
         tabBarActiveTintColor: Colors.primaryDark,
@@ -37,6 +62,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Paths" component={PathsScreen} />
+      {isAdminView ? <Tab.Screen name="Admin" component={AdminCoursesScreen} /> : null}
     </Tab.Navigator>
   );
 }

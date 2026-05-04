@@ -15,7 +15,8 @@ import { Search, Star } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
-import { API_URLS, USER_ID } from '../constants/Config';
+import { API_URLS } from '../constants/Config';
+import { getCurrentUserId } from '../constants/Auth';
 
 const luminoShadow = {
   shadowColor: Colors.navy,
@@ -36,39 +37,74 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const renderStars = (rating) => {
+    return (
+      <View style={styles.ratingRow}>
+        {[1, 2, 3, 4, 5].map((s) => (
+          <Star 
+            key={s}
+            size={12} 
+            fill={s <= Math.round(rating) ? Colors.canary : 'transparent'} 
+            color={Colors.canary} 
+          />
+        ))}
+        <Text style={styles.ratingText}> {rating.toFixed(1)}</Text>
+      </View>
+    );
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      const userId = await getCurrentUserId();
       // Fetch courses
       const courseRes = await fetch(`${API_URLS.PLAYLIST_SERVICE}/playlist/all`);
       const courseData = await courseRes.json();
       const items = courseData.items || [];
       
+      let formatted = [];
       if (Array.isArray(items) && items.length > 0) {
-        const formatted = items.map(course => ({
-          id: course.youtube_playlist_id || course.id || course.playlist_id,
+        formatted = items.map(course => ({
+          id: String(course.youtube_playlist_id || course.id || course.playlist_id),
           title: course.title,
-          category: "Development",
-          rating: 4.8,
-          students: "1.2k",
+          category: course.author_name || "Development",
+          rating: course.rating || 5.0,
+          students: course.total_views || 0,
+          description: course.description || "Master the core concepts of this path.",
           img: course.thumbnail_url || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
         }));
-        setPopularCourses(formatted);
       } else {
-        setPopularCourses([{
+        formatted = [{
           id: 'mock-1', title: 'React Complete Course 2024', category: 'Development', rating: 4.9, students: '18.2k', img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
-        }]);
+        }];
       }
 
-      // Fetch continue paths
-      const pathRes = await fetch(`${API_URLS.PATH_SERVICE}/users/${USER_ID}/enrolled-paths?started_only=true`);
-      const pathData = await pathRes.json();
-      if (Array.isArray(pathData)) {
-        setContinuePaths(pathData);
+      // Fetch continue paths and map progress
+      if (userId) {
+        const pathRes = await fetch(`${API_URLS.PATH_SERVICE}/users/${userId}/enrolled-paths`);
+        const pathData = await pathRes.json();
+        if (Array.isArray(pathData)) {
+          // Only show paths that are NOT 100% complete in "Continue Learning"
+          setContinuePaths(pathData.filter(p => (p.progress || 0) < 100));
+          
+          formatted = formatted.map(course => {
+            // Find a path that contains this course or is this course
+            const match = pathData.find(p => 
+              p.title === course.title || 
+              String(p.path_id) === course.id || 
+              (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id))
+            );
+            return match ? { ...course, progress: match.progress } : course;
+          });
+        }
       }
+      setPopularCourses(formatted);
     } catch (err) {
       console.error('Dashboard Fetch failed:', err);
     } finally {
@@ -172,19 +208,12 @@ export default function DashboardScreen() {
                     <View style={styles.courseInfo}>
                       <Text style={styles.courseTitle} numberOfLines={1}>{course.title}</Text>
                       
-                      <View style={styles.ratingRow}>
-                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                        <Star size={12} fill={Colors.canary} color={Colors.canary} />
-                        <Text style={styles.ratingText}> {course.rating}</Text>
-                      </View>
+                      {renderStars(course.rating)}
                       
-                      <Text style={styles.courseDesc} numberOfLines={1}>10 Foundations of {course.category || 'Intelligence'}</Text>
+                      <Text style={styles.courseDesc} numberOfLines={1}>{course.description}</Text>
                       
                       <View style={styles.courseFooter}>
-                        <Text style={styles.progressTextSmall}>0% complete</Text>
+                        <Text style={styles.progressTextSmall}>{Math.round(course.progress || 0)}% complete</Text>
                         <TouchableOpacity 
                           style={styles.startBtn}
                           onPress={() => navigation.navigate('CourseDetails', { courseId: course.id })}
@@ -216,7 +245,7 @@ const styles = StyleSheet.create({
   },
   webContentWrapper: {
     width: '100%',
-    maxWidth: 800,
+    maxWidth: 820,
     backgroundColor: Colors.offWhite,
     flex: 1,
     boxShadow: '0 0 20px rgba(4,13,67,0.05)',

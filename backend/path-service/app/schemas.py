@@ -58,9 +58,16 @@ class PathItemResponse(BaseModel):
     remaining_videos: int = 0
     progress_percent: float = 0.0
     course_completed: bool = False
+    assessment_completed: bool = False
     next_action_type: str = "next_lesson"
     next_action_label: str = "Next Lesson"
     author_name: str | None = None
+
+class ResourceResponse(BaseModel):
+    id: str
+    title: str
+    url: str
+    resource_type: str
 
 
 class CourseLessonResponse(BaseModel):
@@ -81,13 +88,20 @@ class PathWithItemsResponse(PathResponse):
 
 class CourseDetailResponse(PathItemResponse):
     user_id: uuid.UUID | None = None
+    outcomes: list[str] = Field(default_factory=list)
     current_lesson: CourseLessonResponse | None = None
     next_lesson: CourseLessonResponse | None = None
     lessons: list[CourseLessonResponse] = Field(default_factory=list)
+    resources: list[ResourceResponse] = Field(default_factory=list)
 
 
 class EnrollmentCreate(BaseModel):
     user_id: uuid.UUID
+
+
+class RatingCreate(BaseModel):
+    user_id: uuid.UUID
+    rating: int = Field(..., ge=1, le=5)
 
 
 class EnrollmentResponse(BaseModel):
@@ -127,6 +141,7 @@ class EnrolledPathResponse(BaseModel):
     status: str
     total_courses: int
     completed_courses: int
+    playlist_ids: list[str] = []
 
 
 class LearningHistoryResponse(BaseModel):

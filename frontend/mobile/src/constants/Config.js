@@ -5,9 +5,8 @@ import { Platform } from 'react-native';
 const BASE_IP = Platform.OS === 'web' ? 'localhost' : '10.150.89.71'; 
 
 export const API_URLS = {
+  USER_SERVICE: `http://${BASE_IP}:8001`,
   PLAYLIST_SERVICE: `http://${BASE_IP}:8002`,
   PATH_SERVICE: `http://${BASE_IP}:8006`,
   VIDEO_SERVICE: `http://${BASE_IP}:8003`,
 };
-
-export const USER_ID = '5ea9d9ff-cfca-4c9b-9f87-f86ac0d9a859';

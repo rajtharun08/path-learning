@@ -4,17 +4,19 @@ import MainTabNavigator from './MainTabNavigator';
 import CourseDetailsScreen from '../screens/CourseDetailsScreen';
 import LearningPathScreen from '../screens/LearningPathScreen';
 import VideoPlayerScreen from '../screens/VideoPlayerScreen';
+import LoginScreen from '../screens/LoginScreen';
 
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Main"
+      initialRouteName="Login"
       screenOptions={{
         headerShown: false,
       }}
     >
+      <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Main" component={MainTabNavigator} />
       <Stack.Screen name="CourseDetails" component={CourseDetailsScreen} />
       <Stack.Screen name="LearningPath" component={LearningPathScreen} />

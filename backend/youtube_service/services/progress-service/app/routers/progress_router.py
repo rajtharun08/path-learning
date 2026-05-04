@@ -10,7 +10,7 @@ from app.controllers.progress_controller import ProgressController
 from app.schemas.progress import (
     CourseCompletionResponse, CourseProgressResponse,
     CourseDetailResponse, ProgressResponse, ProgressUpdateRequest, ResumeResponse,
-    BookmarkToggleRequest, NoteCreateRequest, NoteResponse
+    BookmarkToggleRequest, NoteCreateRequest, NoteResponse, AssessmentStatusResponse
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -83,3 +83,13 @@ def course_completion(request: Request, playlist_id: str, user_id: str, db: Sess
 @limiter.limit("100/minute")
 def course_detail(request: Request, playlist_id: str, user_id: str, db: Session = Depends(get_db)):
     return ProgressController(db).course_detail(playlist_id, user_id)
+
+
+@router.get("/course/{playlist_id}/assessment", response_model=AssessmentStatusResponse)
+def get_assessment(playlist_id: str, user_id: str, db: Session = Depends(get_db)):
+    return ProgressController(db).get_assessment(playlist_id, user_id)
+
+
+@router.post("/course/{playlist_id}/assessment/complete", response_model=AssessmentStatusResponse)
+def complete_assessment(playlist_id: str, user_id: str, score: float = 100.0, db: Session = Depends(get_db)):
+    return ProgressController(db).complete_assessment(playlist_id, user_id, score)
