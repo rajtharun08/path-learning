@@ -21,7 +21,8 @@ from app.schemas.content import (
     PlaylistSearchResultResponse,
     VideoMetadataResponse,
     RatingRequest,
-    ResourceCreate
+    ResourceCreate,
+    YoutubeImportRequest,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -98,6 +99,18 @@ def list_playlists(request: Request, pagination: PaginationParams = Depends(), d
     return ContentController(db).list_playlists(pagination)
 
 
+
+
+@router.post("/courses/import-youtube", response_model=PlaylistResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
+def import_youtube_course(
+    request: Request,
+    payload: YoutubeImportRequest,
+    db: Session = Depends(get_db),
+    _: dict[str, object] = Depends(require_staff_token),
+):
+    """Import or re-sync a YouTube playlist as a course. Requires YOUTUBE_API_KEY."""
+    return ContentController(db).import_youtube_course(payload)
 
 
 @router.post("/courses", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)

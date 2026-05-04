@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookOpen, Layers, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react-native';
+import { BookOpen, Download, Layers, Pencil, Plus, ShieldCheck, Trash2, Youtube } from 'lucide-react-native';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
 import { getAuthHeaders, getAuthSession } from '../constants/Auth';
@@ -89,6 +89,9 @@ export default function AdminCoursesScreen() {
   const [showCreatePath, setShowCreatePath] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState(null);
   const [editingLessonId, setEditingLessonId] = useState(null);
+  const [showImportYoutube, setShowImportYoutube] = useState(false);
+  const [importPlaylistUrl, setImportPlaylistUrl] = useState('');
+  const [importingYoutube, setImportingYoutube] = useState(false);
 
   useEffect(() => {
     loadScreen();
@@ -218,6 +221,35 @@ export default function AdminCoursesScreen() {
     setCourseForm(emptyCourseForm);
     setEditingCourseId(null);
     setShowCreateCourse(false);
+  };
+
+  const importYoutubeCourse = async () => {
+    if (!importPlaylistUrl.trim()) {
+      Alert.alert('Missing URL', 'Paste a YouTube playlist URL to import.');
+      return;
+    }
+    try {
+      setImportingYoutube(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/import-youtube`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', accept: 'application/json', ...headers },
+        body: JSON.stringify({ playlist_url: importPlaylistUrl.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.detail || 'Import failed');
+      }
+      setImportPlaylistUrl('');
+      setShowImportYoutube(false);
+      await fetchCourses();
+      setSelectedCourseId(data.youtube_playlist_id);
+      Alert.alert('Import successful!', `"${data.title}" has been imported with ${data.videos?.length || 0} lessons.`);
+    } catch (error) {
+      Alert.alert('Import failed', error.message || 'Please try again.');
+    } finally {
+      setImportingYoutube(false);
+    }
   };
 
   const confirmAction = (title, message, onConfirm) => {
@@ -843,8 +875,49 @@ export default function AdminCoursesScreen() {
             </>
           ) : (
             <>
-              <TouchableOpacity 
-                style={styles.expandableHeader} 
+              {/* Import from YouTube */}
+              <TouchableOpacity
+                style={styles.expandableHeader}
+                onPress={() => setShowImportYoutube(!showImportYoutube)}
+              >
+                <View style={styles.row}>
+                  <Youtube size={18} color={Colors.danger} style={{ marginRight: 8 }} />
+                  <Text style={styles.sectionTitle}>Import from YouTube</Text>
+                </View>
+                <Plus size={20} color={Colors.brandBlue} style={{ transform: [{ rotate: showImportYoutube ? '45deg' : '0deg' }] }} />
+              </TouchableOpacity>
+
+              {showImportYoutube && (
+                <View style={styles.card}>
+                  <Text style={styles.helperText}>
+                    Paste a YouTube playlist URL to automatically import all videos as lessons.
+                    Re-importing the same playlist will sync new/removed videos.
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { marginTop: 12 }]}
+                    placeholder="https://www.youtube.com/playlist?list=PL..."
+                    placeholderTextColor={Colors.silver}
+                    value={importPlaylistUrl}
+                    onChangeText={setImportPlaylistUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, importingYoutube && styles.disabledBtn]}
+                    disabled={importingYoutube}
+                    onPress={importYoutubeCourse}
+                  >
+                    <Download size={16} color={Colors.white} />
+                    <Text style={styles.primaryBtnText}>
+                      {importingYoutube ? 'Importing...' : 'Import Playlist'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Create Manually */}
+              <TouchableOpacity
+                style={styles.expandableHeader}
                 onPress={() => editingCourseId ? cancelEditCourse() : setShowCreateCourse(!showCreateCourse)}
               >
                 <Text style={styles.sectionTitle}>{editingCourseId ? 'Update Course' : 'Create New Course'}</Text>
@@ -982,8 +1055,7 @@ export default function AdminCoursesScreen() {
                             </Text>
                           </View>
                         </TouchableOpacity>
-                        {course.is_manual ? (
-                          <View style={styles.row}>
+                        <View style={styles.row}>
                             <TouchableOpacity
                               onPress={() => editCourse(course)}
                               style={styles.iconBtn}
@@ -997,7 +1069,6 @@ export default function AdminCoursesScreen() {
                               <Trash2 size={18} color={Colors.danger} />
                             </TouchableOpacity>
                           </View>
-                        ) : null}
                       </View>
                     );
                   })
@@ -1013,10 +1084,9 @@ export default function AdminCoursesScreen() {
                     </View>
                   </View>
 
-                  {selectedCourseIsManual ? (
-                    <View>
-                      <Text style={styles.sectionTitle}>{editingLessonId ? 'Update Lesson' : 'Add New Lesson'}</Text>
-                      <View style={styles.addLessonForm}>
+                  <View>
+                    <Text style={styles.sectionTitle}>{editingLessonId ? 'Update Lesson' : 'Add New Lesson'}</Text>
+                    <View style={styles.addLessonForm}>
                         <TextInput
                           style={styles.input}
                           placeholder="YouTube video URL"
@@ -1070,12 +1140,6 @@ export default function AdminCoursesScreen() {
                         )}
                       </View>
                     </View>
-                  ) : (
-                    <View style={styles.readOnlyBanner}>
-                      <Text style={styles.readOnlyTitle}>Imported Course</Text>
-                      <Text style={styles.readOnlyText}>Manual editing is disabled for synced playlists.</Text>
-                    </View>
-                  )}
 
                   <View style={styles.lessonList}>
                     {(selectedCourse.videos || []).length === 0 ? (
@@ -1090,8 +1154,7 @@ export default function AdminCoursesScreen() {
                               <Text style={styles.lessonTitle}>{video.title}</Text>
                               <Text style={styles.lessonMeta}>Position {video.position + 1}</Text>
                             </View>
-                            {selectedCourseIsManual ? (
-                              <View style={styles.row}>
+                            <View style={styles.row}>
                                 <TouchableOpacity
                                   onPress={() => editLesson(video)}
                                   style={styles.iconBtn}
@@ -1105,7 +1168,6 @@ export default function AdminCoursesScreen() {
                                   <Trash2 size={18} color={Colors.danger} />
                                 </TouchableOpacity>
                               </View>
-                            ) : null}
                           </View>
                         ))
                     )}

@@ -112,3 +112,7 @@ class ErrorResponse(BaseModel):
 class RatingRequest(BaseModel):
     rating: float = Field(..., ge=1, le=5)
     user_id: str
+
+
+class YoutubeImportRequest(BaseModel):
+    playlist_url: str = Field(..., min_length=5, description="YouTube playlist URL or playlist ID")

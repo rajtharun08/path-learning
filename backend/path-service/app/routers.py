@@ -315,6 +315,7 @@ async def _fetch_course_detail(
         "next_lesson": progress_payload.get("next_lesson"),
         "lessons": lessons,
         "resources": metadata.get("resources", []),
+        "author_name": metadata.get("author_name"),
     }
 
 

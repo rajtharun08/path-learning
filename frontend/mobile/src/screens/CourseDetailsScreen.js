@@ -68,7 +68,7 @@ export default function CourseDetailsScreen() {
          const hash = generateConsistentHash(courseId);
          const dynamicRating = (4.0 + (hash % 10) / 10).toFixed(1);
          const dynamicStudents = `${(hash % 9) + 1}.${hash % 10}k`;
-         const instructorName = data.author_name || `${data.title.split(' ')[0]} Expert`;
+         const instructorName = data.author_name || 'Unknown Instructor';
 
          setCourse({
            title: data.title,
@@ -218,7 +218,7 @@ export default function CourseDetailsScreen() {
                   <Image source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(course.instructor)}&background=07125E&color=fff` }} style={styles.instructorImg} />
                   <View style={styles.instructorInfo}>
                     <Text style={styles.instructorName}>{course.instructor}</Text>
-                    <Text style={styles.instructorRole}>Course Author</Text>
+                    <Text style={styles.instructorRole}>{course.instructor === 'Unknown Instructor' ? 'No instructor listed' : 'Instructor'}</Text>
                   </View>
                 </View>
               </View>

@@ -10,7 +10,8 @@ from app.schemas.content import (
     PlaylistResponse,
     PlaylistSearchResultResponse,
     VideoMetadataResponse,
-    ResourceCreate
+    ResourceCreate,
+    YoutubeImportRequest,
 )
 from app.services.content_service import ContentService
 
@@ -162,3 +163,21 @@ class ContentController:
                 detail=f"Course '{course_id}' or resource '{resource_id}' not found.",
             )
         return playlist
+
+    def import_youtube_course(self, payload: YoutubeImportRequest):
+        import httpx
+        from app.core.config import settings
+        try:
+            return self.service.import_youtube_course(payload.playlist_url, settings.youtube_api_key)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"YouTube API error: {exc.response.status_code} — {exc.response.text[:200]}",
+            ) from exc
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not reach the YouTube API. Check your network connection.",
+            ) from exc

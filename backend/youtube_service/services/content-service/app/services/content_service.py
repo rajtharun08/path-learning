@@ -17,6 +17,7 @@ from app.schemas.content import (
     ResourceCreate,
 )
 from app.services.youtube_client import extract_youtube_video_id
+from app.services.youtube_import_service import fetch_playlist_data
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,14 @@ class ContentService:
         return self.repo.get_playlist_by_youtube_id(youtube_playlist_id)
 
     def create_manual_course(self, payload: ManualCourseCreate) -> Playlist:
+        course_id = self._generate_manual_course_id()
         playlist = self.repo.create_manual_playlist(
-            youtube_playlist_id=self._generate_manual_course_id(),
+            youtube_playlist_id=course_id,
             title=payload.title,
-            description=payload.description,
-            outcomes=payload.outcomes,
-            thumbnail=payload.thumbnail,
-            author_name=payload.author_name,
+            description=payload.description or "",
+            thumbnail=payload.thumbnail or "",
+            author_name=payload.author_name or "",
+            outcomes=payload.outcomes or [],
         )
 
         for lesson in (payload.lessons or []):
@@ -49,7 +51,7 @@ class ContentService:
 
     def update_manual_course(self, course_id: str, payload: ManualCourseUpdate) -> Optional[Playlist]:
         playlist = self.repo.get_playlist_by_youtube_id(course_id)
-        if not playlist or not playlist.is_manual:
+        if not playlist:
             return None
 
         return self.repo.update_manual_playlist(
@@ -63,7 +65,7 @@ class ContentService:
 
     def delete_manual_course(self, course_id: str) -> bool:
         playlist = self.repo.get_playlist_by_youtube_id(course_id)
-        if not playlist or not playlist.is_manual:
+        if not playlist:
             return False
         self.repo.delete_playlist(playlist)
         return True
@@ -83,9 +85,8 @@ class ContentService:
 
     def add_manual_lesson(self, course_id: str, payload: ManualLessonCreate) -> Optional[Playlist]:
         playlist = self.repo.get_playlist_by_youtube_id(course_id)
-        if not playlist or not playlist.is_manual:
+        if not playlist:
             return None
-
         self._add_manual_lesson(playlist, payload)
         return self.repo.get_playlist_by_youtube_id(course_id)
 
@@ -93,7 +94,7 @@ class ContentService:
         self, course_id: str, lesson_id: str, payload: ManualLessonUpdate
     ) -> Optional[Playlist]:
         playlist = self.repo.get_playlist_by_youtube_id(course_id)
-        if not playlist or not playlist.is_manual:
+        if not playlist:
             return None
 
         lesson = self.repo.get_video_by_id(lesson_id)
@@ -111,10 +112,6 @@ class ContentService:
             updated_url = payload.youtube_url
             if payload.title is not None:
                 updated_title = payload.title
-            
-        # For 100% manual, the admin can update thumbnail and duration via other fields 
-        # but the current schema ManualLessonUpdate doesn't have them yet.
-        # I'll keep it simple for now based on the requested schema update.
 
         if payload.title is not None:
             updated_title = payload.title
@@ -136,7 +133,7 @@ class ContentService:
 
     def delete_manual_lesson(self, course_id: str, lesson_id: str) -> Optional[Playlist]:
         playlist = self.repo.get_playlist_by_youtube_id(course_id)
-        if not playlist or not playlist.is_manual:
+        if not playlist:
             return None
 
         lesson = self.repo.get_video_by_id(lesson_id)
@@ -348,3 +345,75 @@ class ContentService:
             return None
         self.repo.delete_resource(resource_id)
         return self.repo.get_playlist_by_youtube_id(course_id)
+
+    def import_youtube_course(self, playlist_url: str, api_key: str) -> Playlist:
+        """
+        Import or update a course from a YouTube playlist.
+
+        - First import: creates a brand-new course with all videos.
+        - Re-import: updates playlist metadata (title, description, thumbnail)
+          and syncs the video list — adds new videos, removes deleted ones,
+          updates titles/durations. Manual edits to existing videos (title
+          overrides, reordering) are preserved for fields not present in the
+          YouTube payload.
+        """
+        data = fetch_playlist_data(playlist_url, api_key)
+        playlist_id = data["playlist_id"]
+
+        existing = self.repo.get_playlist_by_youtube_id(playlist_id)
+
+        if existing:
+            # Update metadata only
+            self.repo.update_manual_playlist(
+                existing,
+                title=data["title"],
+                description=data["description"],
+                thumbnail=data["thumbnail"],
+                author_name=data["channel_title"],
+            )
+
+            # Sync videos: build map of existing youtube_video_id → Video
+            existing_map: Dict[str, Video] = {}
+            for v in existing.videos:
+                existing_map[v.youtube_video_id] = v
+
+            incoming_ids = {v["youtube_video_id"] for v in data["videos"]}
+
+            # Remove videos that are no longer in the playlist
+            for vid_id, video in list(existing_map.items()):
+                if vid_id not in incoming_ids:
+                    self.repo.db.delete(video)
+
+            # Add new or update existing videos
+            for vdata in data["videos"]:
+                if vdata["youtube_video_id"] in existing_map:
+                    video = existing_map[vdata["youtube_video_id"]]
+                    # Update YouTube-sourced fields; preserve any manual title overrides
+                    video.youtube_url = vdata["youtube_url"]
+                    video.thumbnail = vdata["thumbnail"]
+                    video.duration = vdata["duration"]
+                    video.position = vdata["position"]
+                else:
+                    self.repo.add_video_to_playlist(
+                        existing,
+                        youtube_video_id=vdata["youtube_video_id"],
+                        youtube_url=vdata["youtube_url"],
+                        title=vdata["title"],
+                        thumbnail=vdata["thumbnail"],
+                        duration=vdata["duration"],
+                        position=vdata["position"],
+                    )
+
+            self.repo.db.commit()
+            return self.repo.get_playlist_by_youtube_id(playlist_id) or existing
+
+        # First import — create fresh course (not marked is_manual so it shows as Imported)
+        return self.repo.create_or_update_playlist(
+            youtube_playlist_id=playlist_id,
+            title=data["title"],
+            description=data["description"],
+            videos_data=data["videos"],
+            thumbnail=data["thumbnail"],
+            author_name=data["channel_title"],
+            is_manual=False,
+        )

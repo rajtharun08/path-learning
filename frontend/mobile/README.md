@@ -1,139 +1,95 @@
-# Frontend — Hexaware Luminous (Expo / React Native)
+# Frontend — Hexaware Luminous Mobile App
 
-The mobile and web frontend for the **Hexaware Luminous** learning platform. Built with **Expo SDK 55** and **React Native**, it runs as a native iOS/Android app and a full web app from a single codebase.
+A cross-platform React Native app (iOS, Android, Web) built with Expo. Students browse and enroll in learning paths, watch lessons, and track their progress. Admins manage all content through a built-in Admin Studio.
 
 ---
 
 ## Tech Stack
 
-| Tool | Version |
+| | |
 |---|---|
-| Expo | SDK 55 |
-| React Native | 0.83.6 |
-| React | 19.2.0 |
-| React Navigation | v6 (Stack + Bottom Tabs) |
-| expo-linear-gradient | ^55.0.13 |
-| lucide-react-native | ^0.364.0 |
-| AsyncStorage | 2.2.0 |
-| react-native-youtube-iframe | ^2.3.0 |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js 18+**
-- **Expo CLI** — `npm install -g expo-cli`
-- All backend services must be running (see the root README)
-
-### Install dependencies
-
-```bash
-cd frontend/mobile
-npm install
-```
-
-### Start the app
-
-```bash
-# Web (opens at http://localhost:8081)
-npx expo start --web
-
-# Expo Go (scan QR code with Expo Go app on mobile)
-npx expo start
-
-# Android emulator
-npx expo start --android
-
-# iOS simulator (macOS only)
-npx expo start --ios
-```
-
----
-
-## Project Structure
-
-```
-frontend/mobile/
-├── App.js                  # Root component — fonts, navigation, global header
-├── app.json                # Expo config
-├── src/
-│   ├── constants/
-│   │   ├── Auth.js         # getCurrentUserId, getScopedStorageKey helpers
-│   │   └── Config.js       # API_URLS (backend service endpoints)
-│   ├── navigation/
-│   │   ├── AppNavigator.js    # Root navigator (Auth vs Main)
-│   │   └── MainTabNavigator.js# Bottom tab navigator
-│   ├── screens/
-│   │   ├── LoginScreen.js
-│   │   ├── DashboardScreen.js
-│   │   ├── PathsScreen.js
-│   │   ├── LearningPathScreen.js
-│   │   ├── CourseDetailsScreen.js
-│   │   └── VideoPlayerScreen.js
-│   └── theme/
-│       └── Colors.js       # Global color tokens
-```
+| **Framework** | React Native + Expo |
+| **Navigation** | React Navigation (Stack + Bottom Tabs) |
+| **Icons** | `lucide-react-native` |
+| **Fonts** | Google Fonts via `expo-google-fonts` (Inter) |
+| **Video Player** | `react-native-webview` (YouTube embed) |
 
 ---
 
 ## Screens
 
-| Screen | Route | Description |
+| Screen | Path | Description |
 |---|---|---|
-| `LoginScreen` | `Login` | Student login and admin/staff login |
-| `DashboardScreen` | `Home` | Course list, search, continue learning |
-| `PathsScreen` | `Paths` | Learning path directory |
-| `LearningPathScreen` | `LearningPath` | Path details, curriculum, progress, ratings |
-| `CourseDetailsScreen` | `CourseDetails` | Course lessons, resources, enroll |
-| `VideoPlayerScreen` | `VideoPlayer` | YouTube video player with progress tracking |
+| **Login** | `LoginScreen.js` | Email + password login with role selection |
+| **Dashboard** | `DashboardScreen.js` | Home feed — enrolled paths, course catalog |
+| **Paths** | `PathsScreen.js` | Browse and search learning paths |
+| **Course Details** | `CourseDetailsScreen.js` | Overview, lessons, outcomes, enrollment |
+| **Video Player** | `VideoPlayerScreen.js` | Lesson playback with progress tracking |
+| **Learning Path** | `LearningPathScreen.js` | Step-by-step path progress view |
+| **Search** | `SearchScreen.js` | Search courses and paths |
+| **Admin Studio** | `AdminCoursesScreen.js` | Full admin panel — manage courses, lessons, paths |
+
+---
+
+## Admin Studio Features
+
+The **Admin** tab is only visible to users with `staff` or `admin` roles.
+
+### Courses Tab
+- ✅ **Import from YouTube:** Import entire playlists as courses (requires backend API Key).
+- ✅ **Manual Creation:** Create courses (title, description, outcomes, thumbnail, author).
+- ✅ **Full Editability:** Edit or delete ANY course (manual or imported) and its lessons.
+- ✅ **Thumbnail Support:** Handle YouTube thumbnails or manual Base64 uploads.
+- ✅ **Lesson Management:** Add, edit, reorder, or delete lessons in any course.
+- ✅ **Resources:** Attach links and files to courses.
+
+### Paths Tab
+- ✅ Create learning paths (title, description, editor name, select courses)
+- ✅ Manage path course sequence (reorder with ↑ / ↓, remove courses)
+- ✅ Delete learning paths
 
 ---
 
 ## Configuration
 
-Edit `src/constants/Config.js` to point to your backend services:
+### API Endpoints
+
+Edit `src/constants/Config.js` to set the backend IP:
 
 ```js
+// For Web (same machine): use 'localhost'
+// For Mobile: use your machine's local IP address
+const BASE_IP = Platform.OS === 'web' ? 'localhost' : '192.168.x.x';
+
 export const API_URLS = {
-  USER_SERVICE:     'http://localhost:8001',
-  PLAYLIST_SERVICE: 'http://localhost:8002',
-  PROGRESS_SERVICE: 'http://localhost:8003',
-  ANALYTICS_SERVICE:'http://localhost:8004',
-  PATH_SERVICE:     'http://localhost:8006',
+  USER_SERVICE:     `http://${BASE_IP}:8001`,
+  PLAYLIST_SERVICE: `http://${BASE_IP}:8002`,
+  PATH_SERVICE:     `http://${BASE_IP}:8006`,
+  PROGRESS_SERVICE: `http://${BASE_IP}:8003`,
 };
 ```
 
-> **Mobile devices**: Replace `localhost` with your machine's local IP address (e.g., `192.168.1.x`), since the device cannot reach `localhost` on the host machine.
+---
+
+## Running the App
+
+```bash
+cd frontend/mobile
+npm install
+npx expo start
+```
+
+| Platform | Command |
+|---|---|
+| Web browser | Press `w` |
+| Android emulator | Press `a` |
+| iOS simulator | Press `i` |
+| Physical device | Scan QR code with Expo Go |
 
 ---
 
-## Authentication
+## Notes
 
-- Users log in via the **User Service** (`:8001`)
-- The returned `user_id` (UUID) is persisted in `AsyncStorage`
-- Admin/staff users access the Admin Dashboard inside the app
-- Session is scoped per user using `getScopedStorageKey(key)` to ensure data isolation between accounts on the same device
-
----
-
-## Design System
-
-All global colour tokens are defined in `src/theme/Colors.js`. The app uses a **premium light theme** with:
-
-- **Navy** (`#040D43`) — primary text and interactive elements
-- **Brand Blue** (`#1A56DB`) — buttons and CTAs
-- **Canary Yellow** (`#F5A623`) — star ratings
-- **Off-White** (`#F7F9FC`) — page backgrounds
-- Inter font family (loaded via `@expo-google-fonts/inter`)
-
----
-
-## Key Features
-
-- **Cross-platform** — one codebase for iOS, Android, and Web
-- **Focus-based data refresh** — screens re-fetch data whenever the user navigates back, ensuring progress is always up to date
-- **Max-width layout** — web view capped at 820px for a desktop-friendly reading experience
-- **Star ratings** — users can rate learning paths (1–5 stars); ratings update in real time
-- **YouTube playback** — videos play in-app via `react-native-youtube-iframe`
+- **YouTube Embedding:** Videos are embedded via the official iframe API within a native WebView for optimized performance.
+- **Caching:** The app uses `AsyncStorage` to cache dashboard data for instant loading on revisit.
+- **Dynamic Content:** All instructor names, course outcomes, and resources are fetched in real-time from the backend services.
