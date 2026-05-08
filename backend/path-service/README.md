@@ -15,6 +15,7 @@ Manages **learning paths** — curated sequences of courses that guide students 
 - Enroll students into paths
 - Aggregate per-path progress from the Progress Service
 - Serve enrolled path lists and progress to the frontend dashboard
+- Integrated with the **Permanent Memory** caching system for instantaneous student access
 
 ---
 

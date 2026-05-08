@@ -80,7 +80,7 @@ uvicorn main:app --reload --port 8006
 
 **Port:** `8002` | **DB:** `content_db`
 
-Manages all course content using a **fully manual approach** — no YouTube API key required. Admins create courses, lessons, and resources through the Admin Dashboard.
+Manages all course content. Supports both **Manual Creation** and **YouTube Playlist Import** for a unified content strategy. Admins create courses, lessons, and resources through the Admin Dashboard.
 
 ### Key Endpoints
 

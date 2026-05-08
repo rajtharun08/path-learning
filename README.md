@@ -1,6 +1,6 @@
-# Hexaware Luminous — Learning Platform
+# Hexaware Luminous — Dashboard-Centric Learning Platform
 
-A full-stack, microservices-based learning platform built for Hexaware. Admins create and manage courses and learning paths manually. Students enroll, track progress, and watch lessons through a React Native mobile app.
+A premium, high-performance learning platform built for Hexaware. Features a unified "Explore-as-Dashboard" model, smart path discovery, and persistent "Permanent Memory" caching for an instantaneous user experience.
 
 ---
 ## Architecture Overview
@@ -169,7 +169,7 @@ Each service exposes Swagger UI at `/docs`:
 ## Important Notes
 
 - **YouTube Import:** Requires a `YOUTUBE_API_KEY` in the `content-service/.env` file. This allows admins to pull entire playlists into the platform as courses.
-- **Full Editability:** All courses, whether created manually or imported from YouTube, can be fully edited, reordered, and managed via the Admin Studio.
-- **Sync Logic:** Re-importing a YouTube playlist updates metadata and adds/removes videos to match the source, while preserving manual title overrides.
+- **Permanent Memory:** The platform features advanced `AsyncStorage` caching. Once a course or path is loaded, it remains available instantly, with silent background updates.
+- **High-Performance Dashboard:** The primary entry point is the unified Dashboard, which consolidates course discovery with active learning progress.
 - **Databases:** Are auto-created on first startup via SQLAlchemy's `create_all`.
 - **Thumbnails:** Handled via URLs (YouTube) or Base64 (Manual) as needed.
