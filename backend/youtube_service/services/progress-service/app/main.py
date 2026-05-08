@@ -8,8 +8,19 @@ from app.middleware.exception_handlers import add_exception_handlers
 from app.routers.progress_router import limiter, router
 
 
+from sqlalchemy import text
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Migration: Add course_id to existing video_questions table if it's missing
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE video_questions ADD COLUMN IF NOT EXISTS course_id VARCHAR(100)"))
+            conn.execute(text("ALTER TABLE video_questions ALTER COLUMN video_id DROP NOT NULL"))
+            conn.commit()
+    except Exception as e:
+        print(f"Database migration info: {e}")
+
     Base.metadata.create_all(bind=engine)
     yield
 

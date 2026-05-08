@@ -45,8 +45,8 @@ class ProgressService:
     def toggle_bookmark(self, user_id: str, video_id: str) -> bool:
         return self.repo.toggle_bookmark(user_id, video_id)
 
-    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int):
-        return self.repo.create_note(user_id, video_id, content, video_timestamp)
+    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int, title: str = None):
+        return self.repo.create_note(user_id, video_id, content, video_timestamp, title)
 
     def get_video_notes(self, user_id: str, video_id: str):
         return self.repo.get_notes_for_video(user_id, video_id)

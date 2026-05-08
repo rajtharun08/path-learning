@@ -182,6 +182,7 @@ async def _fetch_course_metadata(
             "content_status": "available",
             "author_name": payload.get("author_name"),
             "resources": payload.get("resources", []),
+            "difficulty": payload.get("difficulty", "Beginner"),
         }
     except (httpx.HTTPError, ValueError, AttributeError):
         return {
@@ -264,6 +265,7 @@ async def _fetch_course_detail(
             "lessons": lessons,
             "resources": metadata.get("resources", []),
             "author_name": metadata.get("author_name"),
+            "difficulty": metadata.get("difficulty", "Beginner"),
         }
 
     url = (
@@ -316,6 +318,7 @@ async def _fetch_course_detail(
         "lessons": lessons,
         "resources": metadata.get("resources", []),
         "author_name": metadata.get("author_name"),
+        "difficulty": metadata.get("difficulty", "Beginner"),
     }
 
 

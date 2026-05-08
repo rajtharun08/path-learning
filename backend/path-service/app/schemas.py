@@ -62,6 +62,7 @@ class PathItemResponse(BaseModel):
     next_action_type: str = "next_lesson"
     next_action_label: str = "Next Lesson"
     author_name: str | None = None
+    difficulty: str = "Beginner"
 
 class ResourceResponse(BaseModel):
     id: str

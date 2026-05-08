@@ -51,10 +51,11 @@ class ProgressRepository:
         self.db.refresh(record)
         return record.is_bookmarked
 
-    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int) -> VideoNote:
+    def create_note(self, user_id: str, video_id: str, content: str, video_timestamp: int, title: str = None) -> VideoNote:
         note = VideoNote(
             user_id=user_id, video_id=video_id,
-            content=content, video_timestamp=video_timestamp
+            content=content, video_timestamp=video_timestamp,
+            title=title
         )
         self.db.add(note)
         self.db.commit()

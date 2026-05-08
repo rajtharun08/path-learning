@@ -37,6 +37,7 @@ class ContentRepository:
         thumbnail: Optional[str] = None,
         author_name: Optional[str] = None,
         outcomes: Optional[List[str]] = None,
+        difficulty: str = "Beginner",
         is_manual: bool = False,
     ) -> Playlist:
         playlist = self.get_playlist_by_youtube_id(youtube_playlist_id)
@@ -51,6 +52,8 @@ class ContentRepository:
                 playlist.thumbnail = thumbnail
             if author_name is not None:
                 playlist.author_name = author_name
+            if difficulty is not None:
+                playlist.difficulty = difficulty
             playlist.last_synced_at = datetime.now(timezone.utc)
         else:
             playlist = Playlist(
@@ -61,6 +64,7 @@ class ContentRepository:
                 outcomes_json=json.dumps(outcomes or []),
                 thumbnail=thumbnail,
                 author_name=author_name,
+                difficulty=difficulty,
             )
             self.db.add(playlist)
             self.db.flush()
@@ -118,6 +122,7 @@ class ContentRepository:
         outcomes: Optional[List[str]],
         thumbnail: Optional[str],
         author_name: Optional[str],
+        difficulty: str = "Beginner",
     ) -> Playlist:
         playlist = Playlist(
             youtube_playlist_id=youtube_playlist_id,
@@ -127,6 +132,7 @@ class ContentRepository:
             outcomes_json=json.dumps(outcomes or []),
             thumbnail=thumbnail,
             author_name=author_name,
+            difficulty=difficulty,
         )
         self.db.add(playlist)
         self.db.commit()
@@ -141,6 +147,7 @@ class ContentRepository:
         outcomes: Optional[List[str]] = None,
         thumbnail: Optional[str] = None,
         author_name: Optional[str] = None,
+        difficulty: Optional[str] = None,
     ) -> Playlist:
         if title is not None:
             playlist.title = title
@@ -152,6 +159,8 @@ class ContentRepository:
             playlist.thumbnail = thumbnail
         if author_name is not None:
             playlist.author_name = author_name
+        if difficulty is not None:
+            playlist.difficulty = difficulty
         playlist.last_synced_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(playlist)

@@ -42,6 +42,7 @@ class PlaylistResponse(BaseModel):
     rating: float = 5.0
     rating_count: int = 1
     total_views: int = 0
+    difficulty: str = "Beginner"
     videos: List[VideoResponse] = Field(default_factory=list)
     resources: List[ResourceResponse] = Field(default_factory=list)
 
@@ -70,6 +71,7 @@ class ManualLessonUpdate(BaseModel):
     youtube_url: Optional[str] = Field(default=None, min_length=3, max_length=500)
     title: Optional[str] = Field(default=None, max_length=500)
     position: Optional[int] = Field(default=None, ge=0)
+    duration: Optional[int] = Field(default=None, ge=0)
 
 
 class ManualCourseCreate(BaseModel):
@@ -78,6 +80,7 @@ class ManualCourseCreate(BaseModel):
     outcomes: Optional[List[str]] = Field(default_factory=list)
     thumbnail: Optional[str] = Field(default="")
     author_name: Optional[str] = Field(default="", max_length=255)
+    difficulty: str = Field(default="Beginner")
     lessons: Optional[List[ManualLessonCreate]] = Field(default_factory=list)
     resources: Optional[List[ResourceCreate]] = Field(default_factory=list)
 
@@ -88,6 +91,7 @@ class ManualCourseUpdate(BaseModel):
     outcomes: Optional[List[str]] = None
     thumbnail: Optional[str] = Field(default=None)
     author_name: Optional[str] = Field(default=None, max_length=255)
+    difficulty: Optional[str] = None
     resources: Optional[List[ResourceCreate]] = None
 
 

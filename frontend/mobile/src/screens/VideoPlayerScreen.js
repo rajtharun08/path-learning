@@ -13,12 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { ArrowLeft, FileText, CheckCircle2, PlayCircle, Lock, ChevronDown, Check, Play, AlignLeft } from 'lucide-react-native';
+import { ArrowLeft, FileText, CheckCircle2, PlayCircle, Lock, ChevronDown, Check, Play, AlignLeft, MessageSquare, ThumbsUp, Send, Sparkles, Search, Printer } from 'lucide-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
-import { getCurrentUserId } from '../constants/Auth';
+import { getCurrentUserId, getAuthSession, getCurrentUser } from '../constants/Auth';
 
 const { width } = Dimensions.get('window');
 
@@ -36,10 +36,23 @@ export default function VideoPlayerScreen() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [noteTitle, setNoteTitle] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [videoNotes, setVideoNotes] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [newQuestionText, setNewQuestionText] = useState('');
+  const [activeQATab, setActiveQATab] = useState('All Questions');
   const [playing, setPlaying] = useState(true);
   const [activeTab, setActiveTab] = useState('Overview');
   const [resources, setResources] = useState([]);
+  const [userName, setUserName] = useState('Student');
+  const [userId, setUserId] = useState(null);
+  const [replyingToId, setReplyingToId] = useState(null);
+  const [replyingToAnswerId, setReplyingToAnswerId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [expandedItems, setExpandedItems] = useState({}); // { [id]: boolean }
+  const [collapsedThreads, setCollapsedThreads] = useState({}); // { [qId]: boolean } (true means hidden)
+  const [downloadedItems, setDownloadedItems] = useState([]); // Array of downloaded lesson notes
   const [nextAction, setNextAction] = useState({ type: 'next_lesson', label: 'Next Lesson' });
 
   const playerRef = useRef();
@@ -115,7 +128,84 @@ export default function VideoPlayerScreen() {
     }
   };
 
+  const fetchQuestions = async () => {
+    if (!courseId) {
+      console.log('No courseId provided to fetchQuestions');
+      return;
+    }
+    try {
+      const uId = await getCurrentUserId();
+      const url = uId 
+        ? `${API_URLS.VIDEO_SERVICE}/course/${courseId}/questions?user_id=${uId}`
+        : `${API_URLS.VIDEO_SERVICE}/course/${courseId}/questions`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setQuestions(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Fetch questions failed with status:', res.status);
+        setQuestions([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch questions:', err);
+      setQuestions([]);
+    }
+  };
+
   useEffect(() => {
+    fetchQuestions();
+  }, [courseId]);
+
+  const handleExportPDF = () => {
+    if (videoNotes.length === 0) {
+      Alert.alert('No Notes', 'You have no notes to export for this lesson.');
+      return;
+    }
+
+    const noteContent = videoNotes.map((n, i) => (
+      `${i + 1}. ${n.title || 'Untitled Note'}\n${n.content}\n\n`
+    )).join('');
+
+    const fullContent = `NOTES FOR: ${currentLesson}\n--------------------------\n\n${noteContent}`;
+
+    if (Platform.OS === 'web') {
+      const element = document.createElement("a");
+      const file = new Blob([fullContent], {type: 'text/plain'});
+      element.href = URL.createObjectURL(file);
+      element.download = `${currentLesson.replace(/\s+/g, '_')}_Notes.txt`;
+      document.body.appendChild(element);
+      element.click();
+    } else {
+      Alert.alert('Download Started', 'Your notes are being prepared for download.');
+    }
+
+    // Track the download
+    const lessonIdx = syllabus.findIndex(s => s.id === currentVideoId) + 1;
+    const newItem = {
+      id: Date.now(),
+      lessonNum: lessonIdx,
+      title: currentLesson,
+      date: new Date().toLocaleDateString(),
+      size: `${(fullContent.length / 1024).toFixed(1)} KB`
+    };
+    
+    setDownloadedItems(prev => {
+      // Avoid duplicates for the same lesson
+      if (prev.find(item => item.title === currentLesson)) return prev;
+      return [newItem, ...prev];
+    });
+  };
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      const user = await getCurrentUser();
+      if (user && user.email) {
+        const namePart = user.email.split('@')[0];
+        setUserName(namePart.charAt(0).toUpperCase() + namePart.slice(1));
+        setUserId(user.id);
+      }
+    };
+    loadUserData();
     fetchNotes();
   }, [currentVideoId]);
 
@@ -218,6 +308,7 @@ export default function VideoPlayerScreen() {
             const nextLesson = syllabus[currentIndex + 1];
             setCurrentVideoId(nextLesson.id);
             setCurrentLesson(nextLesson.title);
+            setLessonUnlocked(false);
         }
     }
     await fetchCourseData();
@@ -276,20 +367,171 @@ export default function VideoPlayerScreen() {
       }
       try {
           const userId = await getCurrentUserId();
-          if (!userId) {
-            return;
-          }
+          if (!userId) return;
           await fetch(`${API_URLS.VIDEO_SERVICE}/video/notes`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ user_id: userId, video_id: currentVideoId, content: noteText, video_timestamp: Math.floor(ts) })
+              body: JSON.stringify({ 
+                user_id: userId, 
+                video_id: currentVideoId, 
+                title: noteTitle,
+                content: noteText, 
+                video_timestamp: Math.floor(ts) 
+              })
           });
           setNoteText('');
+          setNoteTitle('');
           setShowNotesModal(false);
           fetchNotes();
       } catch (err) {
           console.error("Save note failed", err);
       }
+  };
+
+  const handlePostQuestion = async () => {
+    if (!newQuestionText.trim()) return;
+    try {
+      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/course/${courseId}/questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId || 'anonymous', user_name: userName, content: newQuestionText })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQuestions([data, ...questions]);
+        setNewQuestionText('');
+      }
+    } catch (err) {
+      console.error('Failed to post question', err);
+    }
+  };
+
+  const handlePostReply = async (qId, pId = null) => {
+    if (!replyText.trim()) return;
+    try {
+      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/questions/${qId}/answers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          user_id: userId || 'anonymous', 
+          user_name: userName, 
+          content: replyText,
+          is_instructor: false,
+          parent_id: pId
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Refresh all questions to get the new nested structure
+        fetchQuestions();
+        setReplyText('');
+        setReplyingToId(null);
+        setReplyingToAnswerId(null);
+      }
+    } catch (err) {
+      console.error('Failed to post reply', err);
+    }
+  };
+
+
+  const renderAnswer = (ans, qId, depth = 0) => (
+    <View key={ans.id} style={{
+      marginLeft: depth === 0 ? 0 : 16, 
+      borderLeftWidth: depth === 0 ? 0 : 2, 
+      borderLeftColor: Colors.offWhite, 
+      paddingLeft: depth === 0 ? 0 : 12, 
+      marginBottom: 12
+    }}>
+      <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 4}}>
+        <Text style={{fontSize: 12, fontFamily: 'Inter_600SemiBold', color: ans.is_instructor ? Colors.brandBlue : Colors.navy}}>{ans.user_name || 'Student'}</Text>
+        {ans.is_instructor && <Sparkles size={10} color={Colors.brandBlue} style={{marginLeft: 4}} />}
+        <Text style={{fontSize: 10, color: Colors.silver, marginLeft: 8}}>Just now</Text>
+      </View>
+      <View style={{marginBottom: 6}}>
+        {renderTruncatedText(ans.content, `ans_${ans.id}`, 100)}
+      </View>
+      
+      <View style={{flexDirection: 'row', alignItems: 'center', gap: 16}}>
+        <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center'}} onPress={() => handleUpvoteAnswer(ans.id)}>
+          <ThumbsUp size={12} color={ans.has_upvoted ? Colors.brandBlue : Colors.silver} fill={ans.has_upvoted ? Colors.brandBlue : 'transparent'} />
+          <Text style={{color: ans.has_upvoted ? Colors.brandBlue : Colors.silver, fontSize: 11, marginLeft: 4}}>{ans.upvotes || 0}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setReplyingToAnswerId(replyingToAnswerId === ans.id ? null : ans.id)}>
+          <Text style={{color: Colors.silver, fontSize: 11, fontFamily: 'Inter_600SemiBold'}}>Reply</Text>
+        </TouchableOpacity>
+      </View>
+
+      {replyingToAnswerId === ans.id && (
+        <View style={{flexDirection: 'row', marginTop: 10, alignItems: 'center'}}>
+          <TextInput 
+            style={{flex: 1, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, paddingVertical: 4, fontSize: 12}}
+            placeholder={`Reply to ${ans.user_name}...`}
+            value={replyText}
+            onChangeText={setReplyText}
+            autoFocus
+          />
+          <TouchableOpacity onPress={() => handlePostReply(qId, ans.id)} style={{marginLeft: 8}}>
+            <Send size={16} color={Colors.brandBlue} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {ans.replies && ans.replies.length > 0 && (
+        <View style={{marginTop: 10}}>
+          {ans.replies.map(reply => renderAnswer(reply, qId, depth + 1))}
+        </View>
+      )}
+    </View>
+  );
+
+  const handleUpvoteQuestion = async (qId) => {
+    try {
+      const uId = await getCurrentUserId();
+      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/questions/${qId}/upvote?user_id=${uId || 'anonymous'}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        fetchQuestions();
+      }
+    } catch (err) {
+      console.error('Failed to upvote question', err);
+    }
+  };
+
+  const handleUpvoteAnswer = async (aId) => {
+    try {
+      const uId = await getCurrentUserId();
+      const res = await fetch(`${API_URLS.VIDEO_SERVICE}/video/answers/${aId}/upvote?user_id=${uId || 'anonymous'}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        fetchQuestions();
+      }
+    } catch (err) {
+      console.error('Failed to upvote answer', err);
+    }
+  };
+
+  const toggleExpand = (id) => {
+    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const renderTruncatedText = (text, id, limit = 150) => {
+    if (!text || text.length <= limit) return <Text style={{fontSize: 14, color: Colors.navy, lineHeight: 20}}>{text}</Text>;
+    
+    const isExpanded = expandedItems[id];
+    return (
+      <View>
+        <Text style={{fontSize: 14, color: Colors.navy, lineHeight: 20}}>
+          {isExpanded ? text : `${text.substring(0, limit)}...`}
+        </Text>
+        <TouchableOpacity onPress={() => toggleExpand(id)}>
+          <Text style={{color: Colors.brandBlue, fontSize: 13, fontFamily: 'Inter_600SemiBold', marginTop: 4}}>
+            {isExpanded ? 'Show Less' : 'See More'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const handleResume = async () => {
@@ -398,9 +640,11 @@ export default function VideoPlayerScreen() {
               <Text style={[styles.tabText, activeTab === 'Notes' && styles.activeTabText]}>Notes</Text>
               <View style={styles.badge}><Text style={styles.badgeText}>{videoNotes.length}</Text></View>
            </TouchableOpacity>
-           <TouchableOpacity style={[styles.tabItem, activeTab === 'Resources' && styles.activeTabItem]} onPress={() => setActiveTab('Resources')}>
-              <Text style={[styles.tabText, activeTab === 'Resources' && styles.activeTabText]}>Resources</Text>
-              <View style={styles.badge}><Text style={styles.badgeText}>{resources.length}</Text></View>
+           <TouchableOpacity style={[styles.tabItem, activeTab === 'Downloads' && styles.activeTabItem]} onPress={() => setActiveTab('Downloads')}>
+              <Text style={[styles.tabText, activeTab === 'Downloads' && styles.activeTabText]}>Downloads</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={[styles.tabItem, activeTab === 'Q&A' && styles.activeTabItem]} onPress={() => setActiveTab('Q&A')}>
+              <Text style={[styles.tabText, activeTab === 'Q&A' && styles.activeTabText]}>Q&A</Text>
            </TouchableOpacity>
         </View>
 
@@ -444,40 +688,206 @@ export default function VideoPlayerScreen() {
         </View>
         ) : activeTab === 'Notes' ? (
            <View style={styles.syllabusSection}>
-              {videoNotes.length > 0 ? (
-                 videoNotes.map(n => (
-                   <View key={n.id} style={styles.noteItem}>
-                       <Text style={styles.noteContent}>{n.content}</Text>
-                   </View>
-                 ))
-              ) : (
-                 <Text style={styles.progressLabel}>No notes for this lesson yet.</Text>
+              <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10}}>
+                <View style={{flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.offWhite, borderRadius: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.borderLight}}>
+                  <Search size={18} color={Colors.silver} />
+                  <TextInput 
+                    style={{flex: 1, paddingVertical: 8, paddingHorizontal: 8, fontSize: 14}}
+                    placeholder="Search notes..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                </View>
+                <TouchableOpacity 
+                  style={{padding: 10, backgroundColor: Colors.brandBlue + '10', borderRadius: 8}}
+                  onPress={handleExportPDF}
+                >
+                  <Printer size={20} color={Colors.brandBlue} />
+                </TouchableOpacity>
+              </View>
+
+               {videoNotes.length > 0 ? (
+                 videoNotes
+                  .filter(n => 
+                    (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) || 
+                    n.content.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map((n, idx) => (
+                    <View key={n.id} style={[styles.noteItem, {backgroundColor: Colors.white, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: Colors.borderLight}]}>
+                        <View style={{marginBottom: 8}}>
+                          <Text style={{fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.navy}}>
+                            {idx + 1}. {n.title || 'Untitled Note'}
+                          </Text>
+                        </View>
+                        <Text style={{fontSize: 14, color: Colors.textSecondary, lineHeight: 20}}>
+                          {n.content}
+                        </Text>
+                    </View>
+                  ))
+               ) : (
+                  <Text style={styles.progressLabel}>No notes for this lesson yet.</Text>
+               )}
+              {videoNotes.length > 0 && videoNotes.filter(n => (n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())) || n.content.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                <Text style={{textAlign: 'center', color: Colors.silver, marginTop: 20}}>No matching notes found.</Text>
               )}
-           </View>
-        ) : (
+            </View>
+        ) : activeTab === 'Downloads' ? (
            <View style={styles.syllabusSection}>
-              {resources.length > 0 ? (
-                 resources.map(r => (
-                   <TouchableOpacity 
-                     key={r.id} 
-                     style={styles.resourceItem}
-                     onPress={() => Alert.alert('Open Resource', `Opening: ${r.url}`)}
-                   >
-                       <View style={styles.resourceIconWrapper}>
-                          {r.resource_type === 'github' ? <AlignLeft size={20} color={Colors.brandBlue} /> : <FileText size={20} color={Colors.brandBlue} />}
-                       </View>
-                       <View style={styles.resourceInfo}>
-                          <Text style={styles.resourceTitle}>{r.title}</Text>
-                          <Text style={styles.resourceMeta}>{r.resource_type.toUpperCase()}</Text>
-                       </View>
-                       <ChevronDown size={18} color={Colors.silver} style={{transform: [{rotate: '-90deg'}]}} />
-                   </TouchableOpacity>
-                 ))
+              <View style={{backgroundColor: Colors.white, padding: 16, borderRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: Colors.borderLight}}>
+                <Text style={{fontSize: 14, fontFamily: 'Inter_700Bold', color: Colors.navy, marginBottom: 8}}>Storage Management</Text>
+                <View style={{height: 8, backgroundColor: Colors.offWhite, borderRadius: 4, overflow: 'hidden', marginBottom: 8}}>
+                  <View style={{width: '15%', height: '100%', backgroundColor: Colors.brandBlue}} />
+                </View>
+                <Text style={{fontSize: 11, color: Colors.silver}}>1.2 MB used of 100 MB available</Text>
+              </View>
+
+              <Text style={styles.subTitle}>Download History</Text>
+              
+              {downloadedItems.length > 0 ? (
+                downloadedItems.map(item => (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={{
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      backgroundColor: Colors.white, 
+                      padding: 16, 
+                      borderRadius: 12, 
+                      marginBottom: 10, 
+                      borderWidth: 1, 
+                      borderColor: Colors.borderLight
+                    }}
+                    onPress={() => Alert.alert('Already Downloaded', `This file was downloaded on ${item.date}`)}
+                  >
+                      <View style={{width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.brandBlue + '10', alignItems: 'center', justifyContent: 'center', marginRight: 12}}>
+                         <FileText size={20} color={Colors.brandBlue} />
+                      </View>
+                      <View style={{flex: 1}}>
+                        <Text style={{fontSize: 15, fontFamily: 'Inter_700Bold', color: Colors.navy, marginBottom: 2}}>Notes: Lesson {item.lessonNum}</Text>
+                        <Text style={{fontSize: 12, color: Colors.silver, fontFamily: 'Inter_400Regular'}}>{item.title} • {item.size}</Text>
+                      </View>
+                      <CheckCircle2 size={18} color="#10B981" />
+                  </TouchableOpacity>
+                ))
               ) : (
-                 <Text style={styles.progressLabel}>No resources available for this course.</Text>
+                <View style={{alignItems: 'center', paddingVertical: 40}}>
+                  <FileText size={40} color={Colors.borderLight} />
+                  <Text style={{color: Colors.silver, marginTop: 12, fontSize: 13}}>No downloads yet.</Text>
+                </View>
               )}
            </View>
-        )}
+        ) : activeTab === 'Q&A' ? (
+        <View style={styles.syllabusSection}>
+          <Text style={{color: Colors.silver, fontSize: 13, marginBottom: 16}}>Ask questions and get answers from your instructor and peers.</Text>
+          
+          <View style={{flexDirection: 'row', marginBottom: 20}}>
+            <TextInput 
+              style={{flex: 1, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 8, padding: 12, backgroundColor: Colors.white, marginRight: 12}}
+              placeholder="Ask a question..."
+              value={newQuestionText}
+              onChangeText={setNewQuestionText}
+            />
+            <TouchableOpacity 
+              style={{backgroundColor: Colors.brandBlue, paddingHorizontal: 20, justifyContent: 'center', borderRadius: 8}}
+              onPress={handlePostQuestion}
+            >
+              <Text style={{color: Colors.white, fontFamily: 'Inter_600SemiBold'}}>Ask</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{flexDirection: 'row', marginBottom: 16}}>
+             <TouchableOpacity onPress={() => setActiveQATab('All Questions')} style={[{paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, marginRight: 8}, activeQATab === 'All Questions' ? {backgroundColor: Colors.brandBlue + '20'} : {backgroundColor: Colors.offWhite}]}>
+               <Text style={[{fontSize: 13, fontFamily: 'Inter_500Medium'}, activeQATab === 'All Questions' ? {color: Colors.brandBlue} : {color: Colors.silver}]}>All Questions ({questions.length})</Text>
+             </TouchableOpacity>
+             <TouchableOpacity onPress={() => setActiveQATab('My Questions')} style={[{paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16}, activeQATab === 'My Questions' ? {backgroundColor: Colors.brandBlue + '20'} : {backgroundColor: Colors.offWhite}]}>
+               <Text style={[{fontSize: 13, fontFamily: 'Inter_500Medium'}, activeQATab === 'My Questions' ? {color: Colors.brandBlue} : {color: Colors.silver}]}>My Questions ({questions.filter(q => q.user_id === userId).length})</Text>
+             </TouchableOpacity>
+          </View>
+
+          {questions.filter(q => activeQATab === 'All Questions' || q.user_id === userId).map(q => (
+             <View key={q.id} style={{backgroundColor: Colors.white, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.borderLight, marginBottom: 12}}>
+               <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12}}>
+                 <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                   <View style={{width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.brandBlue + '20', alignItems: 'center', justifyContent: 'center', marginRight: 12}}>
+                     <Text style={{color: Colors.brandBlue, fontFamily: 'Inter_600SemiBold', fontSize: 12}}>{q.user_name ? q.user_name.substring(0, 2).toUpperCase() : 'ST'}</Text>
+                   </View>
+                   <View>
+                     <Text style={{fontFamily: 'Inter_600SemiBold', color: Colors.navy, fontSize: 14}}>{q.user_name || 'Anonymous'}</Text>
+                     <Text style={{color: Colors.silver, fontSize: 11}}>Just now</Text>
+                   </View>
+                 </View>
+                 <View style={{backgroundColor: q.status === 'Answered' ? '#E1FCEF' : '#FFF4E5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12}}>
+                   <Text style={{color: q.status === 'Answered' ? '#10B981' : '#F59E0B', fontSize: 10, fontFamily: 'Inter_600SemiBold'}}>{q.status}</Text>
+                 </View>
+               </View>
+               <View style={{marginBottom: 12}}>
+                 {renderTruncatedText(q.content, `q_${q.id}`, 200)}
+               </View>
+               
+               {/* Replies List */}
+               {q.answers && q.answers.length > 0 && (
+                 <View style={{marginBottom: 12}}>
+                   {!collapsedThreads[q.id] ? (
+                     <View style={{marginLeft: 20, borderLeftWidth: 2, borderLeftColor: Colors.offWhite, paddingLeft: 12}}>
+                       {q.answers.map(ans => renderAnswer(ans, q.id))}
+                       <TouchableOpacity 
+                         onPress={() => setCollapsedThreads(prev => ({ ...prev, [q.id]: true }))}
+                         style={{marginTop: 4}}
+                       >
+                         <Text style={{color: Colors.brandBlue, fontSize: 12, fontFamily: 'Inter_600SemiBold'}}>Hide replies</Text>
+                       </TouchableOpacity>
+                     </View>
+                   ) : (
+                     <TouchableOpacity 
+                       onPress={() => setCollapsedThreads(prev => ({ ...prev, [q.id]: false }))}
+                       style={{marginLeft: 32, flexDirection: 'row', alignItems: 'center'}}
+                     >
+                       <View style={{width: 20, height: 1, backgroundColor: Colors.borderLight, marginRight: 8}} />
+                       <Text style={{color: Colors.brandBlue, fontSize: 12, fontFamily: 'Inter_600SemiBold'}}>
+                         View {q.answers.length} {q.answers.length === 1 ? 'reply' : 'replies'}
+                       </Text>
+                     </TouchableOpacity>
+                   )}
+                 </View>
+               )}
+
+               <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                 <View style={{flexDirection: 'row'}}>
+                    <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center', marginRight: 16}} onPress={() => handleUpvoteQuestion(q.id)}>
+                      <ThumbsUp size={14} color={q.has_upvoted ? Colors.brandBlue : Colors.silver} fill={q.has_upvoted ? Colors.brandBlue : 'transparent'} />
+                      <Text style={{color: q.has_upvoted ? Colors.brandBlue : Colors.silver, fontSize: 12, marginLeft: 6}}>{q.upvotes || 0}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{flexDirection: 'row', alignItems: 'center'}} onPress={() => setReplyingToId(replyingToId === q.id ? null : q.id)}>
+                      <MessageSquare size={14} color={Colors.silver} />
+                      <Text style={{color: Colors.silver, fontSize: 12, fontFamily: 'Inter_500Medium', marginLeft: 6}}>Reply</Text>
+                    </TouchableOpacity>
+                 </View>
+                 <Text style={{color: Colors.silver, fontSize: 12}}>{q.answers ? q.answers.length : 0} Replies</Text>
+               </View>
+
+               {replyingToId === q.id && (
+                 <View style={{flexDirection: 'row', marginTop: 12, alignItems: 'center'}}>
+                   <TextInput 
+                     style={{flex: 1, borderBottomWidth: 1, borderBottomColor: Colors.borderLight, paddingVertical: 4, fontSize: 13}}
+                     placeholder="Write a reply..."
+                     value={replyText}
+                     onChangeText={setReplyText}
+                     autoFocus
+                   />
+                   <TouchableOpacity onPress={() => handlePostReply(q.id)} style={{marginLeft: 8}}>
+                     <Send size={18} color={Colors.brandBlue} />
+                   </TouchableOpacity>
+                 </View>
+               )}
+             </View>
+          ))}
+          {questions.length === 0 && (
+            <View style={{padding: 24, alignItems: 'center'}}>
+              <Text style={{color: Colors.silver}}>No questions yet. Be the first to ask!</Text>
+            </View>
+          )}
+        </View>
+        ) : null}
       </ScrollView>
 
       {/* Bottom Button */}
@@ -527,7 +937,7 @@ export default function VideoPlayerScreen() {
                                 // Mock assessment: instantly complete it for now
                                 try {
                                    const userId = await getCurrentUserId();
-                                   const res = await fetch(`${API_URLS.PROGRESS_SERVICE}/course/${courseId}/assessment/complete?user_id=${userId}&score=100`, {
+                                   const res = await fetch(`${API_URLS.VIDEO_SERVICE}/course/${courseId}/assessment/complete?user_id=${userId}&score=100`, {
                                       method: 'POST'
                                    });
                                    if (res.ok) {
@@ -578,6 +988,12 @@ export default function VideoPlayerScreen() {
                 <ChevronDown size={24} color={Colors.textDark} />
               </TouchableOpacity>
             </View>
+            <TextInput 
+              style={[styles.noteInput, {height: 40, marginBottom: 12, fontWeight: '700'}]}
+              placeholder="Note Title (e.g. Introduction to AI)"
+              value={noteTitle}
+              onChangeText={setNoteTitle}
+            />
             <TextInput 
               style={styles.noteInput}
               multiline
@@ -816,7 +1232,6 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     alignItems: 'center',
-    gap: 4,
   },
   actionBtnText: {
     fontSize: 12,

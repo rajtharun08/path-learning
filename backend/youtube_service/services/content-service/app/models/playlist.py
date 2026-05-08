@@ -28,6 +28,7 @@ class Playlist(Base):
     total_views: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     rating: Mapped[float] = mapped_column(Float, nullable=False, default=5.0)
     rating_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    difficulty: Mapped[str] = mapped_column(String(50), nullable=False, default="Beginner")
 
     videos: Mapped[List["Video"]] = relationship(
         "Video", back_populates="playlist", cascade="all, delete-orphan", order_by="Video.position"

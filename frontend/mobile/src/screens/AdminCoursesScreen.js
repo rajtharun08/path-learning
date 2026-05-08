@@ -31,6 +31,7 @@ const emptyCourseForm = {
   outcomes: '',
   thumbnail: '',
   author_name: '',
+  difficulty: 'Beginner',
   resources: [],
 };
 
@@ -48,6 +49,25 @@ const emptyPathForm = {
 };
 
 const QUICK_PICK_LIMIT = 10;
+
+const parseDurationToSeconds = (durationStr) => {
+  if (!durationStr || durationStr.trim() === '') return 0;
+  const trimmed = String(durationStr).trim();
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':');
+    const m = parseInt(parts[0], 10) || 0;
+    const s = parseInt(parts[1], 10) || 0;
+    return (m * 60) + s;
+  }
+  return parseInt(trimmed, 10) || 0;
+};
+
+const formatSecondsToMMSS = (sec) => {
+  if (!sec && sec !== 0) return '';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 export default function AdminCoursesScreen() {
   const [session, setSession] = useState(null);
@@ -184,6 +204,7 @@ export default function AdminCoursesScreen() {
             .split('\n')
             .map(item => item.trim())
             .filter(Boolean),
+          difficulty: courseForm.difficulty,
           lessons: isUpdating ? undefined : [],
         }),
       });
@@ -211,6 +232,7 @@ export default function AdminCoursesScreen() {
       outcomes: Array.isArray(course.outcomes) ? course.outcomes.join('\n') : (course.outcomes || ''),
       thumbnail: course.thumbnail || '',
       author_name: course.author_name || '',
+      difficulty: course.difficulty || 'Beginner',
       resources: course.resources || [],
     });
     setEditingCourseId(course.youtube_playlist_id);
@@ -331,7 +353,7 @@ export default function AdminCoursesScreen() {
         body: JSON.stringify({
           youtube_url: lessonForm.youtube_url.trim(),
           title: lessonForm.title.trim(),
-          duration: lessonForm.duration.trim() !== '' ? parseInt(lessonForm.duration.trim()) : 0,
+          duration: parseDurationToSeconds(lessonForm.duration),
           position: lessonForm.position.trim() !== '' ? parseInt(lessonForm.position.trim()) : (isUpdating ? undefined : nextPosition),
         }),
       });
@@ -355,7 +377,7 @@ export default function AdminCoursesScreen() {
     setLessonForm({
       youtube_url: lesson.youtube_url || `https://www.youtube.com/watch?v=${lesson.youtube_video_id}`,
       title: lesson.title || '',
-      duration: String(lesson.duration || ''),
+      duration: formatSecondsToMMSS(lesson.duration),
       position: String(lesson.position || ''),
     });
     setEditingLessonId(lesson.id);
@@ -970,6 +992,18 @@ export default function AdminCoursesScreen() {
                     value={courseForm.author_name}
                     onChangeText={(value) => setCourseForm(current => ({ ...current, author_name: value }))}
                   />
+                  <Text style={styles.inlineLabel}>Difficulty</Text>
+                  <View style={styles.selectorWrap}>
+                    {['Beginner', 'Intermediate', 'Advanced'].map(level => (
+                      <TouchableOpacity
+                        key={level}
+                        style={[styles.selectorChip, courseForm.difficulty === level && styles.selectorChipActive]}
+                        onPress={() => setCourseForm(current => ({ ...current, difficulty: level }))}
+                      >
+                        <Text style={[styles.selectorChipText, courseForm.difficulty === level && styles.selectorChipTextActive]}>{level}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   <Text style={styles.inlineLabel}>Course Resources</Text>
                   {courseForm.resources.map((resource, index) => (
                     <View key={`resource-${index}`} style={styles.searchResultRow}>
@@ -1051,7 +1085,7 @@ export default function AdminCoursesScreen() {
                           <View style={styles.courseCardText}>
                             <Text style={styles.courseTitle}>{course.title}</Text>
                             <Text style={styles.courseMeta}>
-                              {(course.videos || []).length} lessons • {course.is_manual ? 'Manual' : 'Imported'}
+                              {(course.videos || []).length} lessons • {course.difficulty || 'Beginner'} • {course.is_manual ? 'Manual' : 'Imported'}
                             </Text>
                           </View>
                         </TouchableOpacity>
@@ -1104,9 +1138,8 @@ export default function AdminCoursesScreen() {
                         <View style={styles.row}>
                           <TextInput
                             style={[styles.input, { flex: 1, marginRight: 8 }]}
-                            placeholder="Duration (sec)"
+                            placeholder="Duration (MM:SS)"
                             placeholderTextColor={Colors.silver}
-                            keyboardType="numeric"
                             value={lessonForm.duration}
                             onChangeText={(value) => setLessonForm(current => ({ ...current, duration: value }))}
                           />

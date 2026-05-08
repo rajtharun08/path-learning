@@ -10,7 +10,8 @@ import {
   ScrollView
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Star, Clock, Check, Lock, PlayCircle } from 'lucide-react-native';
+import { ArrowLeft, Star, Clock, Check, Lock, PlayCircle, FileText, ChevronRight, BarChart } from 'lucide-react-native';
+import { Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +30,7 @@ export default function CourseDetailsScreen() {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [resources, setResources] = useState([]);
   const [course, setCourse] = useState({
      title: "Loading Course...",
      rating: 0,
@@ -36,6 +38,7 @@ export default function CourseDetailsScreen() {
      duration: "-",
      desc: "",
      instructor: "Loading...",
+     difficulty: "Beginner",
      img: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
   });
 
@@ -75,10 +78,15 @@ export default function CourseDetailsScreen() {
            rating: data.rating || dynamicRating, 
            students: (data.total_views || 0) + 1, // Add 1 for the current user viewing
            duration: data.duration || (data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours"),
+           difficulty: data.difficulty || "Beginner",
            desc: data.description || "",
            instructor: instructorName,
            img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
          });
+
+         if (data.resources) {
+            setResources(data.resources);
+         }
 
          // Record view on backend
          fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/view`, { method: 'POST' }).catch(e => console.log('View recording failed', e));
@@ -86,7 +94,7 @@ export default function CourseDetailsScreen() {
             setLessons(data.lessons.map((l, i) => ({
                id: l.youtube_video_id || i,
                title: l.title || `Lesson ${i+1}`,
-               duration: l.duration ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
+               duration: (l.duration !== null && l.duration !== undefined) ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
                status: l.completed ? 'complete' : 'playing'
             })));
 
@@ -182,11 +190,15 @@ export default function CourseDetailsScreen() {
                 <Clock size={16} color={Colors.textSilver} />
                 <Text style={styles.metaText}> {course.duration}</Text>
               </View>
+              <View style={styles.metaItem}>
+                <BarChart size={16} color={Colors.textSilver} style={{ transform: [{ rotate: '90deg' }, { scaleY: -1 }] }} />
+                <Text style={styles.metaText}> {course.difficulty}</Text>
+              </View>
             </View>
           </View>
 
           <View style={styles.tabs}>
-            {['Overview', 'Lessons', 'Reviews'].map(tab => (
+            {['Overview', 'Lessons', 'Resources', 'Reviews'].map(tab => (
               <TouchableOpacity 
                 key={tab}
                 style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -265,6 +277,35 @@ export default function CourseDetailsScreen() {
                       );
                     })}
                   </View>
+              </View>
+            )}
+
+            {activeTab === 'Resources' && (
+              <View style={styles.overview}>
+                <Text style={styles.subTitle}>Course Resources</Text>
+                {resources.length > 0 ? (
+                  <View style={styles.lessonsList}>
+                    {resources.map((res, idx) => (
+                      <TouchableOpacity 
+                        key={res.id || idx} 
+                        style={styles.lessonItem}
+                        onPress={() => Alert.alert('Open Resource', `Opening: ${res.url}`)}
+                      >
+                        <View style={styles.lessonIconWrapper}>
+                           <FileText size={18} color={Colors.brandBlue} />
+                        </View>
+                        <View style={styles.lessonInfo}>
+                          <Text style={styles.lessonTitle}>{res.title}</Text>
+                          <Text style={styles.lessonDuration}>{res.resource_type.toUpperCase()}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.lockedState}>
+                    <Text style={styles.lockedText}>No resources currently available for this course.</Text>
+                  </View>
+                )}
               </View>
             )}
 

@@ -18,6 +18,7 @@ class BookmarkToggleRequest(BaseModel):
 class NoteCreateRequest(BaseModel):
     user_id: str = Field(...)
     video_id: str = Field(...)
+    title: Optional[str] = Field(default=None)
     content: str = Field(..., min_length=1)
     video_timestamp: int = Field(..., ge=0)
 
@@ -26,6 +27,7 @@ class NoteResponse(BaseModel):
     id: str
     user_id: str
     video_id: str
+    title: Optional[str] = None
     content: str
     video_timestamp: int
     created_at: datetime

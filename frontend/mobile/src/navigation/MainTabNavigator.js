@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Compass, ShieldCheck } from 'lucide-react-native';
+import { Home, Compass, ShieldCheck, Search } from 'lucide-react-native';
 import DashboardScreen from '../screens/DashboardScreen';
+import ExploreScreen from '../screens/ExploreScreen';
 import PathsScreen from '../screens/PathsScreen';
 import AdminCoursesScreen from '../screens/AdminCoursesScreen';
 import { getAuthSession } from '../constants/Auth';
@@ -38,6 +39,8 @@ export default function MainTabNavigator() {
         tabBarIcon: ({ color, size }) => {
           if (route.name === 'Home') {
             return <Home color={color} size={size} />;
+          } else if (route.name === 'Explore') {
+            return <Search color={color} size={size} />;
           } else if (route.name === 'Paths') {
             return <Compass color={color} size={size} />;
           } else if (route.name === 'Admin') {
@@ -61,6 +64,7 @@ export default function MainTabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
+      <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Paths" component={PathsScreen} />
       {isAdminView ? <Tab.Screen name="Admin" component={AdminCoursesScreen} /> : null}
     </Tab.Navigator>

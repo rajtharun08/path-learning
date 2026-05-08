@@ -39,6 +39,7 @@ class ContentService:
             thumbnail=payload.thumbnail or "",
             author_name=payload.author_name or "",
             outcomes=payload.outcomes or [],
+            difficulty=payload.difficulty or "Beginner",
         )
 
         for lesson in (payload.lessons or []):
@@ -61,6 +62,7 @@ class ContentService:
             outcomes=payload.outcomes,
             thumbnail=payload.thumbnail,
             author_name=payload.author_name,
+            difficulty=payload.difficulty,
         )
 
     def delete_manual_course(self, course_id: str) -> bool:
@@ -115,6 +117,9 @@ class ContentService:
 
         if payload.title is not None:
             updated_title = payload.title
+            
+        if payload.duration is not None:
+            updated_duration = payload.duration
 
         if payload.position is not None:
             self._move_lesson_to_position(playlist, lesson, payload.position)
