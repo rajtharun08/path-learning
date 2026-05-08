@@ -164,6 +164,12 @@ export default function CourseDetailsScreen() {
                if (JSON.stringify(prev) === JSON.stringify(newLessons)) return prev;
                return newLessons;
             });
+
+            if (data.outcomes && data.outcomes.length > 0) {
+              setOutcomes(data.outcomes);
+            } else if (data.lessons && data.lessons.length >= 2) {
+              setOutcomes(data.lessons.slice(0, 4).map(l => l.title));
+            }
          }
       }
     } catch (err) {
