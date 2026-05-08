@@ -123,3 +123,17 @@ class PathRating(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+class CourseEnrollment(Base):
+    __tablename__ = "course_enrollments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "playlist_id", name="uq_course_enrollments_user_playlist"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    playlist_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    enrolled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

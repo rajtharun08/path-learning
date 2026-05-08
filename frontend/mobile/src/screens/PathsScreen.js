@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search as SearchIcon, Star, ChevronRight, Layers } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getScopedStorageKey } from '../constants/Auth';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
 import { getCurrentUserId } from '../constants/Auth';
@@ -42,8 +44,31 @@ export default function PathsScreen() {
   };
 
   useEffect(() => {
+    loadPathsCache();
     fetchEnrolledPaths();
   }, []);
+
+  const loadPathsCache = async () => {
+    try {
+      const [enrolled, topPaths] = await Promise.all([
+        AsyncStorage.getItem('paths_enrolled_cache'),
+        AsyncStorage.getItem('paths_top_cache')
+      ]);
+
+      if (enrolled) {
+        const data = JSON.parse(enrolled);
+        setAllEnrolledPaths(data);
+        setContinuePaths(data.filter(p => (p.progress || 0) < 100));
+      }
+
+      if (topPaths) {
+        setPaths(JSON.parse(topPaths));
+        setLoading(false);
+      }
+    } catch (e) {
+      console.log('Cache load failed', e);
+    }
+  };
 
   const fetchEnrolledPaths = async () => {
     try {
@@ -52,19 +77,49 @@ export default function PathsScreen() {
         setContinuePaths([]);
         return;
       }
+      
       const res = await fetch(`${API_URLS.PATH_SERVICE}/users/${userId}/enrolled-paths`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setAllEnrolledPaths(data);
-        setContinuePaths(data.filter(p => (p.progress || 0) < 100));
+      let enrolledPaths = Array.isArray(data) ? data : [];
+      
+      if (enrolledPaths.filter(p => (p.progress || 0) < 100).length === 0) {
+        const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+        const enrolledCoursesRaw = await AsyncStorage.getItem(enrolledCoursesKey);
+        if (enrolledCoursesRaw) {
+          const enrolledList = JSON.parse(enrolledCoursesRaw);
+          if (enrolledList && enrolledList.length > 0) {
+            const latestCourseId = enrolledList[enrolledList.length - 1];
+            const searchRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/search?q=${latestCourseId}`);
+            const searchData = await searchRes.json();
+            if (Array.isArray(searchData) && searchData.length > 0) {
+              const suggestedPath = searchData[0];
+              const progRes = await fetch(`${API_URLS.PATH_SERVICE}/paths/${suggestedPath.path_id}/progress?user_id=${userId}`);
+              if (progRes.ok) {
+                const progData = await progRes.json();
+                enrolledPaths = [{
+                  path_id: suggestedPath.path_id,
+                  title: suggestedPath.title,
+                  progress: progData.progress_percentage || 0,
+                  status: progData.status
+                }];
+              }
+            }
+          }
+        }
       }
+
+      const freshEnrolled = enrolledPaths.filter(p => (p.progress || 0) < 100);
+      setContinuePaths(prev => JSON.stringify(prev) === JSON.stringify(freshEnrolled) ? prev : freshEnrolled);
+      setAllEnrolledPaths(prev => JSON.stringify(prev) === JSON.stringify(enrolledPaths) ? prev : enrolledPaths);
+      
+      AsyncStorage.setItem('paths_enrolled_cache', JSON.stringify(enrolledPaths));
     } catch (err) {
       console.error('Error fetching enrolled paths:', err);
     }
   };
 
   useEffect(() => {
-    setLoading(true);
+    if (paths.length === 0) setLoading(true);
     const delayDebounceFn = setTimeout(() => {
       const url = searchQuery.trim() === '' 
         ? `${API_URLS.PATH_SERVICE}/paths/top` 
@@ -82,14 +137,22 @@ export default function PathsScreen() {
               duration: "Flexible",
               enrollments: path.total_views || 0
             }));
-            setPaths(formatted);
+            
+            setPaths(prev => {
+              if (JSON.stringify(prev) === JSON.stringify(formatted)) return prev;
+              return formatted;
+            });
+
+            if (!searchQuery) {
+               AsyncStorage.setItem('paths_top_cache', JSON.stringify(formatted));
+            }
           } else {
             setPaths([]);
           }
         })
         .catch(err => {
           console.error('Error fetching paths:', err);
-          setPaths([]);
+          if (paths.length === 0) setPaths([]);
         })
         .finally(() => setLoading(false));
     }, 300);
@@ -115,6 +178,40 @@ export default function PathsScreen() {
         </View>
 
       <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Premium Continue Learning Card - MOVE TO TOP */}
+        {continuePaths.length > 0 && (
+          <View style={styles.premiumContinueSection}>
+            <TouchableOpacity 
+              style={styles.premiumContinueCard}
+              onPress={() => navigation.navigate('LearningPath', { pathId: continuePaths[0].path_id })}
+            >
+              <View style={styles.continueCardTop}>
+                <View style={styles.pathIconBox}>
+                  <Layers size={24} color={Colors.brandBlue} />
+                </View>
+                <View style={styles.continueCardText}>
+                  <Text style={styles.continueLabel}>Continue Path</Text>
+                  <Text style={styles.continueTitle}>{continuePaths[0].title}</Text>
+                  <Text style={styles.progressPercentText}>{Math.round(continuePaths[0].progress || 0)}% completed</Text>
+                </View>
+              </View>
+              
+              <View style={styles.progressRow}>
+                <View style={styles.progressBarLarge}>
+                  <View style={[styles.progressFill, { width: `${continuePaths[0].progress}%` }]} />
+                </View>
+                <TouchableOpacity 
+                  style={styles.premiumResumeBtn}
+                  onPress={() => navigation.navigate('LearningPath', { pathId: continuePaths[0].path_id })}
+                >
+                  <Text style={styles.resumeBtnText}>Resume</Text>
+                  <ChevronRight size={16} color={Colors.white} style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.topSection}>
           <Text style={styles.subtitle}>Track your learning progress and continue where you left off. Stay on track with your learning goals.</Text>
           
@@ -123,37 +220,6 @@ export default function PathsScreen() {
             <Text style={styles.sectionTitle}>Featured Paths</Text>
           </View>
           <Text style={styles.sectionDesc}>Browse and find all public Hexaware paths here.</Text>
-        </View>
-
-        {/* Continue Learning */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitleMain}>Continue Learning</Text>
-          {continuePaths.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.continueCards}>
-              {continuePaths.map(path => (
-                <TouchableOpacity 
-                  key={path.path_id} 
-                  style={styles.continueCard} 
-                  onPress={() => navigation.navigate('LearningPath', { pathId: path.path_id })}
-                >
-                  <Text style={styles.cardTitle}>{path.title}</Text>
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: `${path.progress}%` }]} />
-                    </View>
-                    <Text style={styles.progressText}>{path.progress}% complete</Text>
-                  </View>
-                  <TouchableOpacity style={styles.resumeBtn}>
-                    <Text style={styles.resumeBtnText}>Resume</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.emptyState}>
-               <Text style={styles.emptyText}>You are not currently enrolled in any paths. Start exploring below!</Text>
-            </View>
-          )}
         </View>
 
         {/* Paths List */}
@@ -169,7 +235,15 @@ export default function PathsScreen() {
                 <TouchableOpacity 
                   key={path.id} 
                   style={[styles.pathCard, isCompleted && styles.completedPathCard]} 
-                  onPress={() => navigation.navigate('LearningPath', { pathId: path.id })}
+                  onPress={() => navigation.navigate('LearningPath', { 
+                    pathId: path.id,
+                    initialData: {
+                      title: path.title,
+                      desc: path.desc,
+                      rating: path.rating,
+                      enrollments: path.enrollments
+                    }
+                  })}
                 >
                   <View style={styles.pathIconWrapper}>
                     <Layers size={22} color={isCompleted ? "#10B981" : Colors.brandBlue} />
@@ -301,59 +375,76 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontFamily: 'Inter_400Regular',
   },
-  section: {
-    marginBottom: 32,
+  premiumContinueSection: {
     paddingHorizontal: 24,
+    paddingTop: 20,
+    marginBottom: 24,
   },
-  sectionTitleMain: {
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.navy,
-    marginBottom: 16,
-  },
-  continueCards: {
-    paddingRight: 20,
-  },
-  continueCard: {
-    width: 220,
+  premiumContinueCard: {
     backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginRight: 16,
+    borderRadius: 20,
+    padding: 20,
     ...luminoShadow,
+    borderWidth: 1,
+    borderColor: 'rgba(4,13,67,0.05)',
   },
-  cardTitle: {
-    fontSize: 15,
+  continueCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  pathIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F0F4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  continueCardText: {
+    flex: 1,
+  },
+  continueLabel: {
+    fontSize: 12,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 4,
+  },
+  continueTitle: {
+    fontSize: 16,
     fontFamily: 'Inter_700Bold',
     color: Colors.navy,
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  progressContainer: {
-    marginBottom: 12,
+  progressPercentText: {
+    fontSize: 13,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
   },
-  progressBar: {
-    height: 6,
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressBarLarge: {
+    flex: 1,
+    height: 8,
     backgroundColor: Colors.borderLight,
-    borderRadius: 3,
-    marginBottom: 6,
+    borderRadius: 4,
+    marginRight: 16,
   },
   progressFill: {
     height: '100%',
     backgroundColor: Colors.brandBlue,
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  progressText: {
-    fontSize: 11,
-    color: Colors.silver,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  resumeBtn: {
+  premiumResumeBtn: {
+    flexDirection: 'row',
     backgroundColor: Colors.brandBlue,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
-    padding: 10,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
   },
   resumeBtnText: {
     color: Colors.white,

@@ -21,44 +21,71 @@ import { getCurrentUserId, getScopedStorageKey } from '../constants/Auth';
 export default function LearningPathScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { pathId } = route.params || { pathId: 'frontend-dev' };
+  const { pathId, initialData } = route.params || {};
   
   const [modules, setModules] = useState([]);
-  const [pathName, setPathName] = useState("");
-  const [description, setDescription] = useState("");
-  const [enrollmentCount, setEnrollmentCount] = useState(0);
-  const [pathRating, setPathRating] = useState(0);
+  const [pathName, setPathName] = useState(initialData?.title || "");
+  const [description, setDescription] = useState(initialData?.desc || "");
+  const [enrollmentCount, setEnrollmentCount] = useState(initialData?.enrollments || 0);
+  const [pathRating, setPathRating] = useState(initialData?.rating || 0);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [progressData, setProgressData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialData);
+  const [curriculumLoading, setCurriculumLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchPathData();
-    });
-    return unsubscribe;
-  }, [navigation, pathId]);
+    loadPathCache();
+    fetchPathData();
+  }, [pathId]);
+
+  const loadPathCache = async () => {
+    try {
+      const cacheKey = `path_cache_${pathId}`;
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        const data = JSON.parse(cachedData);
+        setPathName(data.title);
+        setDescription(data.description || "");
+        setPathRating(data.rating || 5.0);
+        setEnrollmentCount(data.total_views || 0);
+        if (data.items) {
+           setModules(data.items.map((item, index) => ({
+              title: item.title,
+              description: item.description || "",
+              thumbnail: item.thumbnail,
+              duration: item.duration || "2h 30m",
+              status: item.course_completed ? "complete" : "locked",
+              id: item.id || item.playlist_id
+           })));
+        }
+        setLoading(false);
+        setCurriculumLoading(false);
+      }
+    } catch (e) {
+      console.log('Path cache load failed', e);
+    }
+  };
 
   const fetchPathData = async () => {
     try {
-      setLoading(true);
+      if (modules.length === 0) setLoading(true);
       const userId = await getCurrentUserId();
       const enrolledPathsKey = await getScopedStorageKey('enrolled_paths');
       // 1. Fetch Path Details
       const res = await fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}${userId ? `?user_id=${userId}` : ''}`);
       if(res.ok) {
           const data = await res.json();
-          setPathName(data.title || "Frontend Development");
+          // Sync logic
+          setPathName(data.title);
           setDescription(data.description || "");
           setEnrollmentCount(data.total_views || 0);
           setPathRating(data.rating || 5.0);
           
-          // Record view
-          fetch(`${API_URLS.PATH_SERVICE}/paths/${pathId}/view`, { method: 'POST' }).catch(e => console.log('Path view failed', e));
- 
+          AsyncStorage.setItem(`path_cache_${pathId}`, JSON.stringify(data));
+
           if(data.items) {
              const firstIncompleteIndex = data.items.findIndex((item) => !item.course_completed);
-             setModules(data.items.map((item, index) => ({
+             const freshModules = data.items.map((item, index) => ({
                 title: item.title,
                 description: item.description || "",
                 thumbnail: item.thumbnail || "https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=200&auto=format&fit=crop",
@@ -67,7 +94,9 @@ export default function LearningPathScreen() {
                   ? "complete"
                   : (firstIncompleteIndex === -1 ? "complete" : (index === firstIncompleteIndex ? "playing" : "locked")),
                 id: item.id || item.playlist_id
-             })));
+             }));
+             
+             setModules(prev => JSON.stringify(prev) === JSON.stringify(freshModules) ? prev : freshModules);
           }
       }
 
@@ -98,6 +127,7 @@ export default function LearningPathScreen() {
       console.log('Error fetching path data', err);
     } finally {
       setLoading(false);
+      setCurriculumLoading(false);
     }
   };
 
@@ -148,7 +178,7 @@ export default function LearningPathScreen() {
     }
   };
 
-  if (loading) {
+  if (loading && !initialData) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primaryDark} />
@@ -226,29 +256,40 @@ export default function LearningPathScreen() {
           <Text style={styles.curriculumTitle}>Curriculum <Text style={styles.moduleCount}>({modules.length} Modules)</Text></Text>
           
           <View style={styles.moduleList}>
-            {modules.map((mod, index) => (
-              <TouchableOpacity 
-                key={mod.id || index} 
-                style={[styles.moduleCard, styles[mod.status]]} 
-                onPress={() => navigation.navigate('CourseDetails', { courseId: mod.id })}
-              >
-                <View style={styles.moduleImgWrapper}>
-                  <Image source={{ uri: mod.thumbnail }} style={styles.moduleImg} />
-                  {mod.status === 'complete' && <View style={[styles.statusIcon, styles.successIcon]}><CheckCircle2 color="white" size={20} /></View>}
-                  {mod.status === 'playing' && <View style={[styles.statusIcon, styles.activeIcon]}><PlayCircle color="white" size={20} /></View>}
-                </View>
-                <View style={styles.moduleInfo}>
-                  <Text style={styles.moduleTitle} numberOfLines={1}>{mod.title}</Text>
-                  {mod.description ? <Text style={styles.moduleDesc} numberOfLines={2}>{mod.description}</Text> : null}
-                  {mod.status === 'playing' && isEnrolled && <Text style={styles.playingBadge}>Now Playing</Text>}
-                  <View style={styles.moduleMeta}>
-                    <Text style={styles.moduleDuration}>{mod.duration}</Text>
-                    {mod.status === 'complete' && isEnrolled && <Text style={styles.completeText}>100% Complete</Text>}
-                    {mod.status === 'playing' && isEnrolled && <Text style={styles.activeText}>Started</Text>}
+            {curriculumLoading ? (
+               <ActivityIndicator size="small" color={Colors.brandBlue} style={{ marginTop: 20 }} />
+            ) : (
+              modules.map((mod, index) => (
+                <TouchableOpacity 
+                  key={mod.id || index} 
+                  style={[styles.moduleCard, styles[mod.status]]} 
+                  onPress={() => navigation.navigate('CourseDetails', { 
+                    courseId: mod.id,
+                    initialData: {
+                      title: mod.title,
+                      img: mod.thumbnail,
+                      desc: mod.description
+                    }
+                  })}
+                >
+                  <View style={styles.moduleImgWrapper}>
+                    <Image source={{ uri: mod.thumbnail }} style={styles.moduleImg} />
+                    {mod.status === 'complete' && <View style={[styles.statusIcon, styles.successIcon]}><CheckCircle2 color="white" size={20} /></View>}
+                    {mod.status === 'playing' && <View style={[styles.statusIcon, styles.activeIcon]}><PlayCircle color="white" size={20} /></View>}
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.moduleInfo}>
+                    <Text style={styles.moduleTitle} numberOfLines={1}>{mod.title}</Text>
+                    {mod.description ? <Text style={styles.moduleDesc} numberOfLines={2}>{mod.description}</Text> : null}
+                    {mod.status === 'playing' && isEnrolled && <Text style={styles.playingBadge}>Now Playing</Text>}
+                    <View style={styles.moduleMeta}>
+                      <Text style={styles.moduleDuration}>{mod.duration}</Text>
+                      {mod.status === 'complete' && isEnrolled && <Text style={styles.completeText}>100% Complete</Text>}
+                      {mod.status === 'playing' && isEnrolled && <Text style={styles.activeText}>Started</Text>}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
 

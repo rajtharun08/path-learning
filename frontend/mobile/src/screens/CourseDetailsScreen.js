@@ -24,14 +24,24 @@ export default function CourseDetailsScreen() {
   const route = useRoute();
   const insets = useSafeAreaInsets();
 
-  const { courseId } = route.params || { courseId: 'playlist-fastapi-basics' };
+  const { courseId, initialData } = route.params || {};
   
   const [activeTab, setActiveTab] = useState('Overview');
-  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(initialData?.isEnrolled || false);
   const [lessons, setLessons] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialData); // Don't show full screen spinner if we have initial data
+  const [lessonsLoading, setLessonsLoading] = useState(true);
   const [resources, setResources] = useState([]);
-  const [course, setCourse] = useState({
+  const [course, setCourse] = useState(initialData ? {
+    title: initialData.title,
+    rating: initialData.rating,
+    students: initialData.students,
+    desc: initialData.desc,
+    img: initialData.img,
+    instructor: "Loading...",
+    difficulty: "Beginner",
+    duration: "-"
+  } : {
      title: "Loading Course...",
      rating: 0,
      students: "0",
@@ -58,9 +68,42 @@ export default function CourseDetailsScreen() {
   ]);
 
   useEffect(() => {
+    loadCourseCache();
     fetchCourseDetails();
     checkEnrollment();
   }, [courseId]);
+
+  const loadCourseCache = async () => {
+    try {
+      const cacheKey = `course_cache_${courseId}`;
+      const cachedData = await AsyncStorage.getItem(cacheKey);
+      if (cachedData) {
+        const data = JSON.parse(cachedData);
+        setCourse({
+          title: data.title,
+          rating: data.rating, 
+          students: data.students,
+          duration: data.duration,
+          difficulty: data.difficulty,
+          desc: data.description || data.desc || "",
+          instructor: data.author_name || data.instructor || 'Instructor',
+          img: data.thumbnail || data.img
+        });
+        if (data.lessons) {
+          setLessons(data.lessons.map((l, i) => ({
+             id: l.youtube_video_id || l.id || i,
+             title: l.title,
+             duration: l.duration_text || "15:00",
+             status: l.completed ? 'complete' : 'playing'
+          })));
+        }
+        setLoading(false);
+        setLessonsLoading(false);
+      }
+    } catch (e) {
+      console.log('Cache load failed', e);
+    }
+  };
 
   const fetchCourseDetails = async () => {
     try {
@@ -70,46 +113,64 @@ export default function CourseDetailsScreen() {
       if(data && data.title) {
          const hash = generateConsistentHash(courseId);
          const dynamicRating = (4.0 + (hash % 10) / 10).toFixed(1);
-         const dynamicStudents = `${(hash % 9) + 1}.${hash % 10}k`;
          const instructorName = data.author_name || 'Unknown Instructor';
 
-         setCourse({
+         const newCourseData = {
            title: data.title,
            rating: data.rating || dynamicRating, 
-           students: (data.total_views || 0) + 1, // Add 1 for the current user viewing
+           students: data.students || 0,
            duration: data.duration || (data.total_lessons ? `${data.total_lessons * 1.5} hours` : "12 hours"),
            difficulty: data.difficulty || "Beginner",
            desc: data.description || "",
            instructor: instructorName,
            img: data.thumbnail || (data.lessons && data.lessons[0]?.thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=800&auto=format&fit=crop"
+         };
+
+         // Only update state if data actually changed to prevent flicker
+         setCourse(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(newCourseData)) return prev;
+            return newCourseData;
          });
+
+         // Persist to local storage
+         AsyncStorage.setItem(`course_cache_${courseId}`, JSON.stringify(data));
 
          if (data.resources) {
             setResources(data.resources);
          }
+         
+          if (data.is_enrolled) {
+            setIsEnrolled(true);
+          } else {
+            const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+            const enrolled = await AsyncStorage.getItem(enrolledCoursesKey);
+            const enrolledList = enrolled ? JSON.parse(enrolled) : [];
+            if (enrolledList.includes(courseId)) {
+              setIsEnrolled(true);
+            } else {
+              setIsEnrolled(false);
+            }
+          }
 
-         // Record view on backend
-         fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/view`, { method: 'POST' }).catch(e => console.log('View recording failed', e));
-          if (data.lessons) {
-            setLessons(data.lessons.map((l, i) => ({
+         if (data.lessons) {
+            const newLessons = data.lessons.map((l, i) => ({
                id: l.youtube_video_id || i,
                title: l.title || `Lesson ${i+1}`,
                duration: (l.duration !== null && l.duration !== undefined) ? `${Math.floor(l.duration / 60)}:${(l.duration % 60).toString().padStart(2, '0')}` : "15:00",
                status: l.completed ? 'complete' : 'playing'
-            })));
-
-            if (data.outcomes && data.outcomes.length > 0) {
-              setOutcomes(data.outcomes);
-            } else if (data.lessons.length >= 2) {
-              // Dynamic fallback: use titles of the first 4 lessons
-              setOutcomes(data.lessons.slice(0, 4).map(l => l.title));
-            }
-          }
+            }));
+            
+            setLessons(prev => {
+               if (JSON.stringify(prev) === JSON.stringify(newLessons)) return prev;
+               return newLessons;
+            });
+         }
       }
     } catch (err) {
       console.log('Backend not available', err);
     } finally {
       setLoading(false);
+      setLessonsLoading(false);
     }
   };
 
@@ -135,16 +196,28 @@ export default function CourseDetailsScreen() {
         enrolledList.push(courseId);
         await AsyncStorage.setItem(enrolledCoursesKey, JSON.stringify(enrolledList));
         
+        // Record enrollment on backend
+        const userId = await getCurrentUserId();
+        if (userId) {
+          await fetch(`${API_URLS.PATH_SERVICE}/courses/${courseId}/enroll?user_id=${userId}`, { 
+            method: 'POST' 
+          }).catch(e => console.log('Backend enrollment failed', e));
+        }
+
         // Trigger a view record on enrollment too to ensure they are counted
         fetch(`${API_URLS.PLAYLIST_SERVICE}/courses/${courseId}/view`, { method: 'POST' }).catch(e => {});
       }
       setIsEnrolled(true);
+      
+      // Refresh course details to get updated student count
+      fetchCourseDetails();
     } catch (err) {
       console.error(err);
     }
   };
 
-  if (loading) {
+  // ONLY show full screen loader if we have NO data at all
+  if (loading && !initialData) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primaryDark} />
@@ -248,7 +321,10 @@ export default function CourseDetailsScreen() {
                   </View>
                 ) : null}
                   <View style={styles.lessonsList}>
-                    {lessons.map((lesson, idx) => {
+                    {lessonsLoading ? (
+                      <ActivityIndicator size="small" color={Colors.primaryDark} style={{ marginTop: 20 }} />
+                    ) : (
+                      lessons.map((lesson, idx) => {
                       const isLocked = !isEnrolled && idx > 0;
                       return (
                         <TouchableOpacity 
@@ -275,7 +351,10 @@ export default function CourseDetailsScreen() {
                           </View>
                         </TouchableOpacity>
                       );
-                    })}
+                    }))}
+                    {!lessonsLoading && lessons.length === 0 && (
+                      <Text style={styles.emptyLessons}>No lessons found for this course.</Text>
+                    )}
                   </View>
               </View>
             )}
@@ -647,5 +726,12 @@ const styles = StyleSheet.create({
     color: Colors.navy,
     fontFamily: 'Inter_400Regular',
     lineHeight: 20,
+  },
+  emptyLessons: {
+    color: Colors.silver,
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    marginTop: 40,
   },
 });

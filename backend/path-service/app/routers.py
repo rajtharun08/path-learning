@@ -183,6 +183,7 @@ async def _fetch_course_metadata(
             "author_name": payload.get("author_name"),
             "resources": payload.get("resources", []),
             "difficulty": payload.get("difficulty", "Beginner"),
+            "total_students": payload.get("total_views", 0),
         }
     except (httpx.HTTPError, ValueError, AttributeError):
         return {
@@ -210,11 +211,69 @@ async def _fetch_course_completion(
         return False
 
 
+async def _get_playlist_student_count(
+    session: AsyncSession, playlist_id: str
+) -> int:
+    """Calculate unique students enrolled in any path containing this playlist, 
+    OR enrolled directly in the course.
+    """
+    from sqlalchemy import select, func, or_
+    from app.models import PathEnrollment, PathItem, CourseEnrollment
+
+    # Unique users from path enrollments
+    path_stmt = (
+        select(PathEnrollment.user_id)
+        .join(PathItem, PathItem.path_id == PathEnrollment.path_id)
+        .where(PathItem.playlist_id == playlist_id)
+    )
+    
+    # Unique users from direct course enrollments
+    course_stmt = (
+        select(CourseEnrollment.user_id)
+        .where(CourseEnrollment.playlist_id == playlist_id)
+    )
+
+    # Union the two sets of user IDs and count them
+    final_stmt = select(func.count(func.distinct(path_stmt.union(course_stmt).subquery().c.user_id)))
+    
+    result = await session.execute(final_stmt)
+    return result.scalar() or 0
+
+
 async def _fetch_course_detail(
-    client: httpx.AsyncClient, playlist_id: str, user_id: uuid.UUID | None = None
+    client: httpx.AsyncClient,
+    playlist_id: str,
+    user_id: uuid.UUID | None = None,
+    session: AsyncSession | None = None,
 ) -> dict[str, object]:
     payload = await _fetch_playlist_payload(client, playlist_id)
     metadata = await _fetch_course_metadata(client, playlist_id)
+
+    # Check enrollment status if user_id is provided
+    is_enrolled = False
+    if user_id and session:
+        from app.models import CourseEnrollment, PathEnrollment, PathItem
+        from sqlalchemy import select, or_
+        
+        # Check direct enrollment
+        direct_stmt = select(CourseEnrollment).where(
+            CourseEnrollment.user_id == user_id,
+            CourseEnrollment.playlist_id == playlist_id
+        )
+        direct_res = await session.execute(direct_stmt)
+        if direct_res.first():
+            is_enrolled = True
+        else:
+            # Check if enrolled via any path
+            path_stmt = select(PathEnrollment).join(
+                PathItem, PathItem.path_id == PathEnrollment.path_id
+            ).where(
+                PathEnrollment.user_id == user_id,
+                PathItem.playlist_id == playlist_id
+            )
+            path_res = await session.execute(path_stmt)
+            if path_res.first():
+                is_enrolled = True
 
     videos = []
     if payload is not None:
@@ -266,6 +325,8 @@ async def _fetch_course_detail(
             "resources": metadata.get("resources", []),
             "author_name": metadata.get("author_name"),
             "difficulty": metadata.get("difficulty", "Beginner"),
+            "students": await _get_playlist_student_count(session, playlist_id) if session else metadata.get("total_students", 0),
+            "is_enrolled": is_enrolled,
         }
 
     url = (
@@ -319,6 +380,8 @@ async def _fetch_course_detail(
         "resources": metadata.get("resources", []),
         "author_name": metadata.get("author_name"),
         "difficulty": metadata.get("difficulty", "Beginner"),
+        "students": await _get_playlist_student_count(session, playlist_id) if session else metadata.get("total_students", 0),
+        "is_enrolled": is_enrolled,
     }
 
 
@@ -715,7 +778,7 @@ async def add_path_items(
         session, client, path_id
     )
     course_details = await asyncio.gather(
-        *[_fetch_course_detail(client, item.playlist_id) for item in items]
+        *[_fetch_course_detail(client, item.playlist_id, session=session) for item in items]
     )
 
     return PathWithItemsResponse(
@@ -745,7 +808,7 @@ async def get_path(
 
     course_details = await asyncio.gather(
         *[
-            _fetch_course_detail(client, item.playlist_id, user_id)
+            _fetch_course_detail(client, item.playlist_id, user_id, session=session)
             for item in items
         ]
     )
@@ -777,10 +840,29 @@ async def delete_path(
 async def get_course(
     playlist_id: str,
     user_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_db_session),
     client: httpx.AsyncClient = Depends(get_http_client),
 ) -> CourseDetailResponse:
-    course = await _fetch_course_detail(client, playlist_id, user_id)
+    course = await _fetch_course_detail(client, playlist_id, user_id, session=session)
     return CourseDetailResponse(**course)
+
+
+@router.post("/courses/{playlist_id}/enroll", status_code=status.HTTP_204_NO_CONTENT)
+async def enroll_in_course(
+    playlist_id: str,
+    user_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    from app.models import CourseEnrollment
+    from sqlalchemy.dialects.postgresql import insert
+    
+    stmt = insert(CourseEnrollment).values(
+        user_id=user_id,
+        playlist_id=playlist_id
+    ).on_conflict_do_nothing(index_elements=['user_id', 'playlist_id'])
+    
+    await session.execute(stmt)
+    await session.commit()
 
 
 @router.post("/paths/{path_id}/view", status_code=status.HTTP_204_NO_CONTENT)
@@ -1036,3 +1118,53 @@ async def get_learning_history(
 
     result = await session.execute(query.order_by(LearningHistory.created_at.desc()))
     return list(result.scalars().all())
+@router.get("/courses/{playlist_id}/progress")
+async def get_course_progress(
+    playlist_id: str,
+    user_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+    client: httpx.AsyncClient = Depends(get_http_client),
+) -> dict:
+    from app.models import CourseEnrollment
+    
+    # Check if enrolled
+    enrolled_stmt = select(CourseEnrollment).where(
+        CourseEnrollment.user_id == user_id,
+        CourseEnrollment.playlist_id == playlist_id
+    )
+    enrolled_res = await session.execute(enrolled_stmt)
+    if not enrolled_res.first():
+        # Also check path enrollment
+        path_stmt = select(PathEnrollment).join(
+            PathItem, PathItem.path_id == PathEnrollment.path_id
+        ).where(
+            PathEnrollment.user_id == user_id,
+            PathItem.playlist_id == playlist_id
+        )
+        path_res = await session.execute(path_stmt)
+        if not path_res.first():
+            return {"progress": 0, "status": "not_enrolled"}
+
+    # Fetch course details to get lesson count
+    metadata = await _fetch_course_metadata(client, playlist_id)
+    total_lessons = metadata.get("total_lessons", 0)
+    
+    if total_lessons == 0:
+        return {"progress": 0, "status": "no_content"}
+
+    # Fetch completed lessons from learning history
+    history_stmt = select(func.count(LearningHistory.id)).where(
+        LearningHistory.user_id == user_id,
+        LearningHistory.playlist_id == playlist_id,
+        LearningHistory.event_type == "lesson_completed"
+    )
+    history_res = await session.execute(history_stmt)
+    completed_lessons = history_res.scalar() or 0
+
+    progress = round((completed_lessons / total_lessons) * 100) if total_lessons > 0 else 0
+    return {
+        "progress": progress,
+        "completed_lessons": completed_lessons,
+        "total_lessons": total_lessons,
+        "status": "completed" if progress >= 100 else "in_progress"
+    }

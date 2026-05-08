@@ -11,13 +11,13 @@ import {
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Star } from 'lucide-react-native';
+import { Search, Star, BookOpen, ChevronRight } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../theme/Colors';
 import { API_URLS } from '../constants/Config';
-import { getCurrentUserId } from '../constants/Auth';
+import { getCurrentUserId, getScopedStorageKey } from '../constants/Auth';
 
 const luminoShadow = {
   shadowColor: Colors.navy,
@@ -37,6 +37,7 @@ export default function ExploreScreen() {
   const [allEnrolledPaths, setAllEnrolledPaths] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeCourse, setActiveCourse] = useState(null);
 
   useEffect(() => {
     loadCache();
@@ -92,17 +93,18 @@ export default function ExploreScreen() {
   }, [searchQuery]);
 
   const renderStars = (rating) => {
+    const safeRating = typeof rating === 'number' ? rating : 5.0;
     return (
       <View style={styles.ratingRow}>
         {[1, 2, 3, 4, 5].map((s) => (
           <Star 
             key={s}
             size={12} 
-            fill={s <= Math.round(rating) ? Colors.canary : 'transparent'} 
+            fill={s <= Math.round(safeRating) ? Colors.canary : 'transparent'} 
             color={Colors.canary} 
           />
         ))}
-        <Text style={styles.ratingText}> {rating.toFixed(1)}</Text>
+        <Text style={styles.ratingText}> {safeRating.toFixed(1)}</Text>
       </View>
     );
   };
@@ -175,15 +177,15 @@ export default function ExploreScreen() {
           rating: course.rating || 5.0,
           students: course.total_views || 0,
           description: course.description || "Master the core concepts of this path.",
-          img: course.thumbnail || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop"
+          img: course.thumbnail || (course.videos && course.videos[0] && course.videos[0].thumbnail) || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=600&auto=format&fit=crop",
+          total_views: course.total_views || 0,
+          difficulty: course.difficulty || "Beginner"
         }));
       } else {
-        formatted = [{
-          id: 'mock-1', title: 'React Complete Course 2024', category: 'Development', rating: 4.9, students: '18.2k', img: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600&auto=format&fit=crop"
-        }];
+        formatted = [];
       }
 
-      // Map progress from parallel pathData
+      // Map progress from parallel pathData and direct enrollments
       if (Array.isArray(pathData) && pathData.length > 0) {
         formatted = formatted.map(course => {
           const match = pathData.find(p => 
@@ -194,12 +196,95 @@ export default function ExploreScreen() {
           return match ? { ...course, progress: match.progress } : course;
         });
       }
+
+      // Final pass: if still 0% but enrolled, fetch individual progress
+      if (userId) {
+        const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+        const enrolledStr = await AsyncStorage.getItem(enrolledCoursesKey);
+        const enrolledIds = enrolledStr ? JSON.parse(enrolledStr) : [];
+        
+        formatted = await Promise.all(formatted.map(async (course) => {
+          if ((course.progress || 0) === 0 && enrolledIds.includes(course.id)) {
+            try {
+              const pRes = await fetch(`${API_URLS.PATH_SERVICE}/courses/${course.id}/progress?user_id=${userId}`);
+              if (pRes.ok) {
+                const pData = await pRes.json();
+                return { ...course, progress: pData.progress || 0 };
+              }
+            } catch (e) {}
+          }
+          return course;
+        }));
+      }
       
+      // Load most recent active course for the premium card
+      let latestActiveCourse = null;
+      const enrolledCoursesKey = await getScopedStorageKey('enrolled_courses');
+      const enrolled = await AsyncStorage.getItem(enrolledCoursesKey);
+      if (enrolled) {
+        const enrolledList = JSON.parse(enrolled);
+        if (enrolledList && enrolledList.length > 0) {
+          const courseId = enrolledList[enrolledList.length - 1];
+          const fetchUrl = userId 
+            ? `${API_URLS.PATH_SERVICE}/courses/${courseId}?user_id=${userId}`
+            : `${API_URLS.PLAYLIST_SERVICE}/playlist/${courseId}`;
+            
+          const res = await fetch(fetchUrl);
+          if (res.ok) {
+            const data = await res.json();
+            latestActiveCourse = {
+              title: data.title,
+              course_id: courseId,
+              progress: data.progress_percent || 0 
+            };
+            setActiveCourse(latestActiveCourse);
+          }
+        }
+      }
+      
+      // Final pass: Sync popularCourses with activeCourse progress and direct enrollments
+      const finalEnrolledStr = await AsyncStorage.getItem(enrolledCoursesKey);
+      const finalEnrolledIds = finalEnrolledStr ? JSON.parse(finalEnrolledStr) : [];
+
+      formatted = await Promise.all(formatted.map(async (course) => {
+        const isEnrolledLocally = finalEnrolledIds.includes(course.id);
+        
+        // Priority 1: Match with activeCourse at the top
+        if (latestActiveCourse && (course.id === latestActiveCourse.course_id || course.title === latestActiveCourse.title)) {
+          return { ...course, progress: latestActiveCourse.progress, isEnrolled: true };
+        }
+        
+        // Priority 2: Fetch individual progress if enrolled
+        if (isEnrolledLocally) {
+          try {
+            const pRes = await fetch(`${API_URLS.PATH_SERVICE}/courses/${course.id}/progress?user_id=${userId}`);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              return { ...course, progress: pData.progress || 0, isEnrolled: true };
+            }
+          } catch (e) {}
+          return { ...course, isEnrolled: true }; // Enrolled but maybe 0%
+        }
+        
+        // Priority 3: Check if enrolled via path
+        const isEnrolledViaPath = pathData && pathData.some(p => 
+          p.title === course.title || 
+          String(p.path_id) === course.id || 
+          (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id))
+        );
+        
+        if (isEnrolledViaPath) {
+           const match = pathData.find(p => p.title === course.title || String(p.path_id) === course.id || (p.playlist_ids && p.playlist_ids.some(pid => String(pid) === course.id)));
+           return { ...course, progress: match.progress || 0, isEnrolled: true };
+        }
+
+        return { ...course, isEnrolled: false };
+      }));
+
       setPopularCourses(formatted);
 
       // Persist to disk for instant load next time
       AsyncStorage.setItem('dashboard_courses', JSON.stringify(formatted));
-      AsyncStorage.setItem('dashboard_continue', JSON.stringify(pathData.filter(p => (p.progress || 0) < 100)));
       AsyncStorage.setItem('dashboard_all_enrolled', JSON.stringify(pathData));
     } catch (err) {
       console.error('Dashboard Fetch failed:', err);
@@ -227,45 +312,36 @@ export default function ExploreScreen() {
         </View>
 
         <View style={styles.content}>
-          {/* Continue Learning */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Continue Learning</Text>
-            {continuePaths.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.continueCards}>
-                {continuePaths.map(path => (
-                  <TouchableOpacity 
-                    key={path.path_id} 
-                    style={styles.continueCard} 
-                    onPress={() => navigation.navigate('LearningPath', { pathId: path.path_id })}
-                  >
-                    <Text style={styles.cardTitle}>{path.title}</Text>
-                    <View style={styles.progressContainer}>
-                      <View style={styles.progressBar}>
-                        <View style={[styles.progressFill, { width: `${path.progress || 0}%` }]} />
-                      </View>
-                      <Text style={styles.progressText}>{path.progress || 0}% complete</Text>
+          {/* Continue Learning - Premium Card */}
+          {activeCourse && (
+            <View style={styles.section}>
+               <View style={styles.premiumContinueCard}>
+                  <View style={styles.continueCardHeader}>
+                    <View style={styles.courseIconContainer}>
+                      <BookOpen size={24} color={Colors.brandBlue} />
+                    </View>
+                    <View style={styles.continueCardText}>
+                      <Text style={styles.continueLabel}>Continue Learning</Text>
+                      <Text style={styles.continueTitle} numberOfLines={1}>{activeCourse.title}</Text>
+                      <Text style={styles.progressPercentText}>{Math.round(activeCourse.progress || 0)}% completed</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.progressRow}>
+                    <View style={styles.progressBarLarge}>
+                      <View style={[styles.progressFill, { width: `${activeCourse.progress || 0}%` }]} />
                     </View>
                     <TouchableOpacity 
-                      style={styles.resumeBtn} 
-                      onPress={() => navigation.navigate('LearningPath', { pathId: path.path_id })}
+                      style={styles.premiumResumeBtn}
+                      onPress={() => navigation.navigate('VideoPlayer', { courseId: activeCourse.course_id })}
                     >
                       <Text style={styles.resumeBtnText}>Resume</Text>
+                      <ChevronRight size={14} color={Colors.white} style={{marginLeft: 4}} />
                     </TouchableOpacity>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>You haven't enrolled in any paths yet. Explore the Paths directory to start your journey!</Text>
-                <TouchableOpacity 
-                  style={styles.exploreBtn} 
-                  onPress={() => navigation.navigate('Paths')}
-                >
-                  <Text style={styles.exploreBtnText}>Explore Paths</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+                  </View>
+                </View>
+            </View>
+          )}
 
           {/* Popular Courses */}
           <View style={styles.section}>
@@ -315,7 +391,9 @@ export default function ExploreScreen() {
                       <Text style={styles.courseDesc} numberOfLines={1}>{course.description}</Text>
                       
                       <View style={styles.courseFooter}>
-                        <Text style={styles.progressTextSmall}>{Math.round(course.progress || 0)}% complete</Text>
+                        {course.isEnrolled ? (
+                          <Text style={styles.progressTextSmall}>{Math.round(course.progress || 0)}% complete</Text>
+                        ) : <View />}
                         <TouchableOpacity 
                           style={styles.startBtn}
                           onPress={() => navigation.navigate('CourseDetails', { courseId: course.id })}
@@ -399,51 +477,74 @@ const styles = StyleSheet.create({
     paddingRight: 20,
     paddingVertical: 10,
   },
-  continueCard: {
-    width: 220,
+  premiumContinueCard: {
     backgroundColor: Colors.white,
     borderRadius: 16,
-    padding: 16,
-    marginRight: 16,
+    padding: 20,
     ...luminoShadow,
   },
-  cardTitle: {
-    fontSize: 15,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.navy,
-    marginBottom: 12,
+  continueCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  progressContainer: {
-    marginBottom: 12,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: Colors.borderLight,
-    borderRadius: 3,
-    marginBottom: 6,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.brandBlue,
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 11,
-    color: Colors.silver,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  resumeBtn: {
-    backgroundColor: Colors.brandBlue,
-    borderRadius: 8,
-    padding: 10,
+  courseIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#F0F4FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    marginRight: 16,
+  },
+  continueCardText: {
+    flex: 1,
+  },
+  continueLabel: {
+    fontSize: 12,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 4,
+  },
+  continueTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.navy,
+    marginBottom: 4,
+  },
+  progressPercentText: {
+    fontSize: 13,
+    color: Colors.silver,
+    fontFamily: 'Inter_500Medium',
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressBarLarge: {
+    flex: 1,
+    height: 8,
+    backgroundColor: Colors.borderLight,
+    borderRadius: 4,
+    marginRight: 16,
+  },
+  premiumResumeBtn: {
+    flexDirection: 'row',
+    backgroundColor: Colors.brandBlue,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   resumeBtnText: {
     color: Colors.white,
     fontSize: 13,
     fontFamily: 'Inter_700Bold',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.brandBlue,
+    borderRadius: 4,
   },
   emptyState: {
     padding: 24,

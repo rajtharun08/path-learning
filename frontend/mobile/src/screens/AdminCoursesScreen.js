@@ -164,7 +164,19 @@ export default function AdminCoursesScreen() {
       throw new Error(data?.detail || 'Failed to load courses');
     }
 
-    const items = Array.isArray(data.items) ? data.items : [];
+    const rawItems = Array.isArray(data.items) ? data.items : [];
+    
+    // Fetch true student counts for each course from path-service
+    const items = await Promise.all(rawItems.map(async (course) => {
+      try {
+        const studentRes = await fetch(`${API_URLS.PATH_SERVICE}/courses/${course.youtube_playlist_id}`);
+        const studentData = await studentRes.json();
+        return { ...course, students_count: studentData.students || 0 };
+      } catch (e) {
+        return { ...course, students_count: 0 };
+      }
+    }));
+
     setCourses(items);
     if (!selectedCourseId && items.length > 0) {
       setSelectedCourseId(items[0].youtube_playlist_id);
@@ -1085,7 +1097,7 @@ export default function AdminCoursesScreen() {
                           <View style={styles.courseCardText}>
                             <Text style={styles.courseTitle}>{course.title}</Text>
                             <Text style={styles.courseMeta}>
-                              {(course.videos || []).length} lessons • {course.difficulty || 'Beginner'} • {course.is_manual ? 'Manual' : 'Imported'}
+                              {(course.videos || []).length} lessons • {course.students_count || 0} students • {course.difficulty || 'Beginner'} • {course.is_manual ? 'Manual' : 'Imported'}
                             </Text>
                           </View>
                         </TouchableOpacity>

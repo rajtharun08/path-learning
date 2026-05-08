@@ -63,6 +63,8 @@ class PathItemResponse(BaseModel):
     next_action_label: str = "Next Lesson"
     author_name: str | None = None
     difficulty: str = "Beginner"
+    students: int = 0
+    is_enrolled: bool = False
 
 class ResourceResponse(BaseModel):
     id: str
